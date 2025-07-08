@@ -1,0 +1,9 @@
+{
+  "workbench.startupEditor": "none",
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "terminal.integrated.defaultLocation": "editor",
+  "workbench.panel.defaultLocation": "right",
+  "terminal.integrated.rightClickBehavior": "default"
+}
+

@@ -1,0 +1,6 @@
+{
+  "persistLogin": true,
+  "rememberSession": true,
+  "autoSave": true,
+  "integrationMode": "vscode"
+}
