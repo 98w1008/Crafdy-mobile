@@ -94,13 +94,13 @@ export default function StyledButton({
         backgroundColor: disabled ? (Colors.base?.surfaceSubtle ?? '#EEF1F6') : Colors.base.surfaceElevated,
         borderWidth: 1,
         borderColor: disabled ? Colors.border.light : Colors.border.DEFAULT,
-        ...Shadows.sm,
+        ...(Shadows?.sm ?? {}),
       },
       outline: {
         backgroundColor: Colors.base.surface,
         borderWidth: 2,
         borderColor: disabled ? Colors.border.light : (Colors.primary?.DEFAULT ?? '#16A34A'),
-        ...Shadows.sm,
+        ...(Shadows?.sm ?? {}),
       },
       ghost: {
         backgroundColor: 'transparent',
@@ -119,7 +119,7 @@ export default function StyledButton({
       premium: {
         backgroundColor: disabled ? (Colors.base?.surfaceSubtle ?? '#EEF1F6') : Colors.accent.DEFAULT,
         borderWidth: 0,
-        ...Shadows.xl,
+        ...(Shadows?.xl ?? {}),
       },
     }
 

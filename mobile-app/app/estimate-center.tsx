@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { useAuth, useRole } from '@/contexts/AuthContext'
-import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/GrayDesignTokens'
 import { StyledText, StyledButton } from '@/components/ui'
 import * as Haptics from 'expo-haptics'
 
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border.light,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
-    fontSize: Typography.sizes.base,
+    fontSize: Typography?.sizes?.base ?? 16,
     color: Colors.text.primary,
     backgroundColor: Colors.base.surfaceSubtle,
   },
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border.light,
     borderRadius: BorderRadius.sm,
     padding: Spacing.sm,
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography?.sizes?.sm ?? 14,
     color: Colors.text.primary,
     backgroundColor: Colors.base.background,
     marginTop: Spacing.xs,
