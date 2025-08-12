@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 export default function EstimatesScreen() {
   const [estimates, setEstimates] = useState<any[]>([])
@@ -130,7 +130,7 @@ export default function EstimatesScreen() {
               <TouchableOpacity 
                 key={estimate.id} 
                 style={styles.estimateCard}
-                onPress={() => router.push(`/estimates/${estimate.id}`)}
+                onPress={() => console.log(`見積 ${estimate.id} の詳細表示機能は開発中です`)}
               >
                 <View style={styles.estimateHeader}>
                   <View style={styles.estimateInfo}>
@@ -168,13 +168,13 @@ export default function EstimatesScreen() {
                   <View style={styles.actionButtons}>
                     <TouchableOpacity 
                       style={styles.editButton}
-                      onPress={() => router.push(`/estimates/${estimate.id}/edit`)}
+                      onPress={() => console.log(`見積 ${estimate.id} の編集機能は開発中です`)}
                     >
                       <Text style={styles.editButtonText}>編集</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.viewButton}
-                      onPress={() => router.push(`/estimates/${estimate.id}`)}
+                      onPress={() => console.log(`見積 ${estimate.id} の詳細表示機能は開発中です`)}
                     >
                       <Text style={styles.viewButtonText}>詳細 →</Text>
                     </TouchableOpacity>
@@ -191,7 +191,7 @@ export default function EstimatesScreen() {
           <View style={styles.actionGrid}>
             <TouchableOpacity 
               style={styles.actionCard}
-              onPress={() => router.push('/(tabs)/upload')}
+              onPress={() => console.log('OCR読取機能は開発中です')}
             >
               <Text style={styles.actionIcon}>📄</Text>
               <Text style={styles.actionTitle}>OCR読取</Text>
@@ -209,7 +209,7 @@ export default function EstimatesScreen() {
             
             <TouchableOpacity 
               style={styles.actionCard}
-              onPress={() => router.push('/estimates/template')}
+              onPress={() => console.log('テンプレート機能は開発中です')}
             >
               <Text style={styles.actionIcon}>📋</Text>
               <Text style={styles.actionTitle}>テンプレート</Text>
