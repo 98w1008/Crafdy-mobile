@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native'
 import * as Haptics from 'expo-haptics'
-import { Colors, Typography, Spacing, BorderRadius } from '@/design/tokens'
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/GrayDesignTokens'
 
 export interface StyledButtonProps {
   title: string
@@ -84,7 +84,7 @@ export default function StyledButton({
       primary: {
         backgroundColor: disabled ? (Colors.base?.surfaceSubtle ?? '#EEF1F6') : (Colors.primary?.DEFAULT ?? '#16A34A'),
         borderWidth: 0,
-        ...(elevated && Shadows.lg),
+        ...(elevated && (Shadows?.lg ?? {})),
         ...(gradient && { 
           // Gradient handled by LinearGradient component 
           backgroundColor: 'transparent'
@@ -109,7 +109,7 @@ export default function StyledButton({
       danger: {
         backgroundColor: disabled ? (Colors.base?.surfaceSubtle ?? '#EEF1F6') : Colors.semantic.error,
         borderWidth: 0,
-        ...(elevated && Shadows.lg),
+        ...(elevated && (Shadows?.lg ?? {})),
       },
       success: {
         backgroundColor: disabled ? (Colors.base?.surfaceSubtle ?? '#EEF1F6') : Colors.semantic.success,

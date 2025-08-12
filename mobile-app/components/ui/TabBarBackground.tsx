@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Colors } from '@/design/tokens';
+import { Colors } from '@/constants/GrayDesignTokens';
 
 // Android・Web向け新仕様タブバー背景
 export default function CrafdyTabBarBackground() {

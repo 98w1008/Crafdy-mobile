@@ -1,7 +1,7 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { StyleSheet, View } from 'react-native';
-import { Colors } from '@/design/tokens';
+import { Colors } from '@/constants/GrayDesignTokens';
 
 export default function CrafdyTabBarBackground() {
   return (
