@@ -1,330 +1,359 @@
-import React, { useEffect, useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import React, { useState } from 'react'
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+  Alert,
+} from 'react-native'
 import { router } from 'expo-router'
-import { supabase } from '../../src/lib/supabase'
+import { useAuth, useRole } from '@/contexts/AuthContext'
+import { Colors, getThemeColors, getCardStyle } from '@/constants/Colors'
+import { useColorScheme } from '@/hooks/useColorScheme'
+import { StyledText } from '@/components/ui'
+
+interface Project {
+  id: string
+  name: string
+  description: string
+  status: 'planning' | 'active' | 'completed' | 'paused'
+  progress: number
+  startDate: string
+  endDate?: string
+  location: string
+  budget: number
+  team: string[]
+  monthlyCost: number
+}
+
 
 export default function ProjectsScreen() {
-  const [projects, setProjects] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { user, profile } = useAuth()
+  const userRole = useRole()
+  const { colorScheme } = useColorScheme()
+  const theme = getThemeColors(colorScheme)
 
-  useEffect(() => {
-    fetchProjects()
-  }, [])
-
-  const fetchProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching projects:', error)
-      } else {
-        setProjects(data || [])
-      }
-    } catch (error) {
-      console.error('Fetch error:', error)
-    } finally {
-      setLoading(false)
+  // サンプルプロジェクトデータ（実際にはSupabaseから取得）
+  const projects: Project[] = [
+    {
+      id: '1',
+      name: '新宿オフィスビル建設',
+      description: '地上15階建てオフィスビル新築工事',
+      status: 'active',
+      progress: 65,
+      startDate: '2024-01-15',
+      endDate: '2024-12-30',
+      location: '東京都新宿区',
+      budget: 150000000,
+      team: ['田中', '佐藤', '山田', '鈴木'],
+      monthlyCost: 12500000
+    },
+    {
+      id: '2',
+      name: 'マンション改修工事',
+      description: '築20年マンションの大規模改修',
+      status: 'active',
+      progress: 30,
+      startDate: '2024-02-01',
+      endDate: '2024-08-31',
+      location: '神奈川県横浜市',
+      budget: 80000000,
+      team: ['高橋', '伊藤'],
+      monthlyCost: 8900000
+    },
+    {
+      id: '3',
+      name: '商業施設リニューアル',
+      description: 'ショッピングモール内装工事',
+      status: 'completed',
+      progress: 100,
+      startDate: '2023-10-01',
+      endDate: '2024-01-15',
+      location: '埼玉県さいたま市',
+      budget: 45000000,
+      team: ['渡辺', '加藤'],
+      monthlyCost: 0
+    },
+    {
+      id: '4',
+      name: '住宅建築プロジェクト',
+      description: '戸建て住宅新築工事',
+      status: 'planning',
+      progress: 10,
+      startDate: '2024-04-01',
+      location: '千葉県船橋市',
+      budget: 35000000,
+      team: ['中村'],
+      monthlyCost: 2800000
     }
-  }
+  ]
 
-  const getStatusColor = (status: string) => {
+
+
+  const getStatusColor = (status: Project['status']) => {
     switch (status) {
-      case 'in_progress':
-        return '#10b981'
-      case 'completed':
-        return '#3b82f6'
-      default:
-        return '#6b7280'
+      case 'active': return Colors.accent.DEFAULT
+      case 'completed': return Colors.accent[600]
+      case 'paused': return Colors.semantic.warning
+      case 'planning': return Colors.accent[300]
+      default: return theme.text.secondary
     }
   }
 
-  const getStatusLabel = (status: string) => {
+  const getStatusText = (status: Project['status']) => {
     switch (status) {
-      case 'in_progress':
-        return '進行中'
-      case 'completed':
-        return '完了'
-      default:
-        return '未開始'
+      case 'active': return '進行中'
+      case 'completed': return '完了'
+      case 'paused': return '一時停止'
+      case 'planning': return '計画中'
+      default: return '不明'
     }
   }
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>読み込み中...</Text>
+  const handleProjectPress = (project: Project) => {
+    router.push({ 
+      pathname: '/projects/[id]/chat', 
+      params: { id: project.id, name: project.name } 
+    });
+  }
+
+  const handleNewProject = () => {
+    router.push('/new-project')
+  }
+
+
+
+  const renderProjectCard = (project: Project) => (
+    <TouchableOpacity
+      key={project.id}
+      style={[styles.projectCard, getCardStyle(colorScheme)]}
+      onPress={() => handleProjectPress(project)}
+      activeOpacity={0.8}
+    >
+      {/* Project Header with Name and Status */}
+      <View style={styles.projectHeader}>
+        <StyledText variant="title" weight="semibold" numberOfLines={1} style={{ color: theme.text.primary }}>
+          {project.name}
+        </StyledText>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(project.status) + '20' }]}>
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor(project.status) }]} />
+          <StyledText 
+            variant="caption" 
+            weight="medium"
+            style={{ color: getStatusColor(project.status) }}
+          >
+            {getStatusText(project.status)}
+          </StyledText>
+        </View>
       </View>
-    )
-  }
+
+      {/* Key Information Grid */}
+      <View style={styles.infoGrid}>
+        {/* Location */}
+        <View style={styles.infoItem}>
+          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>📍 場所</StyledText>
+          <StyledText variant="body" weight="medium" style={{ color: theme.text.primary }}>
+            {project.location}
+          </StyledText>
+        </View>
+
+        {/* Progress */}
+        <View style={styles.infoItem}>
+          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>📊 進捗</StyledText>
+          <StyledText variant="body" weight="bold" style={{ color: Colors.accent.DEFAULT }}>
+            {project.progress}%
+          </StyledText>
+        </View>
+
+        {/* Team Count */}
+        <View style={styles.infoItem}>
+          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>👥 人数</StyledText>
+          <StyledText variant="body" weight="medium" style={{ color: theme.text.primary }}>
+            {project.team.length}名
+          </StyledText>
+        </View>
+
+        {/* Monthly Cost */}
+        <View style={styles.infoItem}>
+          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>💰 今月コスト</StyledText>
+          <StyledText variant="body" weight="bold" style={{ color: theme.text.primary }}>
+            {project.monthlyCost > 0 ? `¥${(project.monthlyCost / 10000).toLocaleString()}万` : '---'}
+          </StyledText>
+        </View>
+      </View>
+
+      {/* Progress Bar */}
+      {project.status !== 'planning' && project.progress > 0 && (
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { backgroundColor: theme.border.light }]}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { 
+                  width: `${project.progress}%`,
+                  backgroundColor: Colors.accent.DEFAULT
+                }
+              ]} 
+            />
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  )
+
+  const renderEmptyState = () => (
+    <Card variant="outlined" style={styles.emptyCard}>
+      <StyledText variant="heading3" align="center" style={styles.emptyIcon}>
+        📋
+      </StyledText>
+      <StyledText variant="title" weight="semibold" align="center">
+        プロジェクトがありません
+      </StyledText>
+      <StyledText variant="body" color="secondary" align="center" style={styles.emptyDescription}>
+        新しいプロジェクトを作成して、工事管理を始めましょう
+      </StyledText>
+      <StyledButton
+        title="新規プロジェクト作成"
+        variant="success"
+        size="lg"
+        elevated={true}
+        icon={<StyledText variant="title" color="onPrimary">🚀</StyledText>}
+        onPress={handleNewProject}
+        style={styles.emptyButton}
+      />
+    </Card>
+  )
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>現場一覧</Text>
-        <TouchableOpacity style={styles.addButton}>
-          <Text style={styles.addButtonText}>+ 新規現場</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ヘッダー */}
+        <View style={styles.header}>
+          <StyledText variant="heading2" weight="bold" style={{ color: theme.text.primary }}>
+            現場一覧
+          </StyledText>
+          <StyledText variant="body" style={{ color: theme.text.secondary }}>
+            案件名・場所・進捗・人数・コストを一覧表示
+          </StyledText>
+        </View>
+
+        {/* 新規作成ボタン - 大きく目立つボタン */}
+        <TouchableOpacity
+          style={[styles.newProjectButton, { backgroundColor: Colors.accent.DEFAULT }]}
+          onPress={handleNewProject}
+          activeOpacity={0.8}
+        >
+          <StyledText variant="title" weight="bold" style={{ color: Colors.accent[50] }}>
+            ➕ 新規プロジェクト作成
+          </StyledText>
         </TouchableOpacity>
-      </View>
 
-      <ScrollView style={styles.content}>
-        {projects.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🏗️</Text>
-            <Text style={styles.emptyTitle}>現場がありません</Text>
-            <Text style={styles.emptyDescription}>
-              新しい現場を追加して{'\n'}プロジェクト管理を始めましょう
-            </Text>
-            <TouchableOpacity style={styles.createButton}>
-              <Text style={styles.createButtonText}>現場を作成</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.projectList}>
-            {projects.map((project) => (
-              <TouchableOpacity 
-                key={project.id} 
-                style={styles.projectCard}
-                onPress={() => router.push(`/projects/${project.id}`)}
-              >
-                <View style={styles.projectHeader}>
-                  <Text style={styles.projectName}>{project.name}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(project.status) + '20' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(project.status) }]}>
-                      {getStatusLabel(project.status)}
-                    </Text>
-                  </View>
-                </View>
-
-                {project.address && (
-                  <Text style={styles.projectAddress}>📍 {project.address}</Text>
-                )}
-
-                {project.progress_rate > 0 && (
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View 
-                        style={[
-                          styles.progressFill, 
-                          { width: `${project.progress_rate * 100}%` }
-                        ]} 
-                      />
-                    </View>
-                    <Text style={styles.progressText}>
-                      {Math.round(project.progress_rate * 100)}%
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.projectFooter}>
-                  <Text style={styles.budgetText}>
-                    予算: ¥{project.total_budget?.toLocaleString() || '未設定'}
-                  </Text>
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity 
-                      style={styles.chatButton}
-                      onPress={() => router.push(`/projects/${project.id}/chat`)}
-                    >
-                      <Text style={styles.chatButtonText}>💬 日報</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.detailButton}
-                      onPress={() => router.push(`/projects/${project.id}`)}
-                    >
-                      <Text style={styles.detailButtonText}>詳細 →</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        {/* プロジェクト一覧 */}
+        <View style={styles.projectsList}>
+          {projects.length > 0 ? (
+            projects.map(renderProjectCard)
+          ) : (
+            renderEmptyState()
+          )}
+        </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: Colors.light.background.primary, // Will be overridden by theme
   },
-  centerContainer: {
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 32,
   },
   header: {
-    backgroundColor: 'white',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  addButton: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 80,
-  },
-  emptyIcon: {
-    fontSize: 64,
     marginBottom: 24,
+    paddingTop: 8,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
-  },
-  createButton: {
-    backgroundColor: '#2563eb',
+  newProjectButton: {
+    marginBottom: 24,
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    paddingVertical: 12,
     borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
   },
-  createButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  projectList: {
+  projectsList: {
     gap: 16,
   },
   projectCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    padding: 16,
+    marginBottom: 8,
   },
   projectHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
-  },
-  projectName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    flex: 1,
-    marginRight: 12,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  projectAddress: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 16,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
     gap: 12,
   },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+    flexShrink: 0,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+    gap: 12,
+  },
+  infoItem: {
+    width: '48%',
+    minWidth: 120,
+  },
+  progressContainer: {
+    marginTop: 8,
+  },
   progressBar: {
-    flex: 1,
     height: 6,
-    backgroundColor: '#e5e7eb',
     borderRadius: 3,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2563eb',
     borderRadius: 3,
   },
-  progressText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
-  projectFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyCard: {
     alignItems: 'center',
+    paddingVertical: 48,
   },
-  budgetText: {
-    fontSize: 12,
-    color: '#9ca3af',
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
+  emptyDescription: {
+    marginTop: 8,
+    marginBottom: 24,
   },
-  chatButton: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  chatButtonText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  detailButton: {
-    backgroundColor: '#dbeafe',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  detailButtonText: {
-    fontSize: 12,
-    color: '#2563eb',
-    fontWeight: '600',
+  emptyButton: {
+    minWidth: 200,
   },
 })
