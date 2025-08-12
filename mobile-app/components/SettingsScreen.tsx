@@ -170,7 +170,7 @@ export default function SettingsScreen() {
         },
         appearance: {
           colors: {
-            primary: Colors.primary,
+            primary: Colors?.primary?.DEFAULT ?? '#52525B',
           },
         },
       })
@@ -417,21 +417,21 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundDark,
+    backgroundColor: Colors?.base?.background ?? '#F3F4F6',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing.md,
+    padding: Spacing?.md,
     paddingBottom: Spacing['2xl'],
   },
   header: {
-    marginBottom: Spacing.lg,
-    paddingTop: Spacing.sm,
+    marginBottom: Spacing?.lg,
+    paddingTop: Spacing?.sm,
   },
   userCard: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing?.lg,
   },
   userInfo: {
     flexDirection: 'row',
@@ -440,31 +440,31 @@ const styles = StyleSheet.create({
   avatar: {
     width: 60,
     height: 60,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors?.primary?.DEFAULT ?? '#52525B',
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.md,
+    marginRight: Spacing?.md,
   },
   userDetails: {
     flex: 1,
   },
   roleBadge: {
-    backgroundColor: Colors.navy,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.md,
+    backgroundColor: Colors?.primary?.DEFAULT ?? '#52525B',
+    paddingHorizontal: Spacing?.sm,
+    paddingVertical: Spacing?.xs,
+    borderRadius: BorderRadius?.md,
     alignSelf: 'flex-start',
-    marginTop: Spacing.xs,
+    marginTop: Spacing?.xs,
   },
   planCard: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing?.lg,
   },
   section: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing?.lg,
   },
   sectionTitle: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing?.md,
   },
   currentPlanInfo: {
     flexDirection: 'row',
@@ -472,78 +472,78 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   planOption: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing?.md,
     position: 'relative',
   },
   currentPlanOption: {
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: Colors?.primary?.DEFAULT ?? '#52525B',
   },
   popularPlan: {
     borderWidth: 2,
-    borderColor: Colors.warning,
+    borderColor: Colors?.semantic?.warning ?? '#D97706',
   },
   popularBadge: {
     position: 'absolute',
     top: -8,
-    right: Spacing.md,
-    backgroundColor: Colors.warning,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.md,
+    right: Spacing?.md,
+    backgroundColor: Colors?.semantic?.warning ?? '#D97706',
+    paddingHorizontal: Spacing?.sm,
+    paddingVertical: Spacing?.xs,
+    borderRadius: BorderRadius?.md,
     zIndex: 1,
   },
   planHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing?.md,
   },
   features: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing?.md,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing?.xs,
   },
   checkmark: {
-    marginRight: Spacing.sm,
-    fontSize: Typography.base,
+    marginRight: Spacing?.sm,
+    fontSize: Typography?.base,
   },
   featureText: {
     flex: 1,
   },
   upgradeButton: {
-    marginTop: Spacing.sm,
+    marginTop: Spacing?.sm,
   },
   currentBadge: {
-    backgroundColor: Colors.primaryAlpha,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(82, 82, 91, 0.1)',
+    padding: Spacing?.sm,
+    borderRadius: BorderRadius?.md,
     alignItems: 'center',
-    marginTop: Spacing.sm,
+    marginTop: Spacing?.sm,
   },
   settingsCard: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing?.lg,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing?.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    borderBottomColor: Colors?.border?.light ?? '#E5E7EB',
   },
   settingContent: {
     flex: 1,
   },
   signOutButton: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing?.lg,
   },
   footer: {
     alignItems: 'center',
-    paddingTop: Spacing.lg,
-    gap: Spacing.xs,
+    paddingTop: Spacing?.lg,
+    gap: Spacing?.xs,
   },
 })
