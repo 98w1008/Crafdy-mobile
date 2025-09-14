@@ -1,31 +1,32 @@
 const { getDefaultConfig } = require('expo/metro-config');
 
+/** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// Node.js 17対応のための最小限設定
-config.resolver = {
-  ...config.resolver,
-  unstable_enableSymlinks: false,
+// Security Agent - Metro configuration for network handling
+config.resolver.platforms = ['ios', 'android', 'native', 'web'];
+
+// Ensure proper module resolution for polyfills
+config.resolver.alias = {
+  ...config.resolver.alias,
+  'react-native-get-random-values': require.resolve('react-native-get-random-values'),
+  'react-native-url-polyfill/auto': require.resolve('react-native-url-polyfill/auto'),
 };
 
-// Metro watcher完全無効化でAbortSignalエラーを回避
-config.server = {
-  ...config.server,
-  enhanceMiddleware: (middleware) => {
-    return (req, res, next) => {
-      // AbortSignal問題を回避
-      if (req.signal && !req.signal.throwIfAborted) {
-        req.signal.throwIfAborted = function() {
-          if (this.aborted) {
-            const error = new Error('The operation was aborted');
-            error.name = 'AbortError';
-            throw error;
-          }
-        };
-      }
-      return middleware(req, res, next);
-    };
-  },
+// Web-specific configuration to exclude Stripe
+config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
+config.resolver.platforms = ['ios', 'android', 'native', 'web'];
+
+// Block Stripe modules on web platform
+config.resolver.blockList = [
+  /node_modules\/@stripe\/stripe-react-native\/.*\.js$/,
+];
+
+// Platform-specific module resolution
+config.resolver.platformMap = {
+  web: {
+    '@stripe/stripe-react-native': false,
+  }
 };
 
 module.exports = config;

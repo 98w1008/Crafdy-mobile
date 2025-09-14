@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   StyleSheet,
@@ -6,12 +6,15 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native'
 import { router } from 'expo-router'
 import { useAuth, useRole } from '@/contexts/AuthContext'
-import { Colors, getThemeColors, getCardStyle } from '@/constants/Colors'
-import { useColorScheme } from '@/hooks/useColorScheme'
-import { StyledText } from '@/components/ui'
+import { useColors, useSpacing, useRadius } from '@/theme/ThemeProvider'
+import { StyledText, Card, StyledButton, Icon } from '@/components/ui'
+import { StatusBadge } from '@/components/ApprovalActions'
+import { getSubmissions, SubmissionItem } from '@/lib/approval-system'
+import GlobalFABMenu from '@/components/chat/FabActions'
 
 interface Project {
   id: string
@@ -31,8 +34,38 @@ interface Project {
 export default function ProjectsScreen() {
   const { user, profile } = useAuth()
   const userRole = useRole()
-  const { colorScheme } = useColorScheme()
-  const theme = getThemeColors(colorScheme)
+  const colors = useColors()
+  const spacing = useSpacing()
+  const radius = useRadius()
+
+  const [pendingSubmissions, setPendingSubmissions] = useState<SubmissionItem[]>([])
+  const [loadingSubmissions, setLoadingSubmissions] = useState(true)
+
+  // 承認待ちの提出物を取得
+  useEffect(() => {
+    if (!user) return
+
+    const fetchPendingSubmissions = async () => {
+      try {
+        setLoadingSubmissions(true)
+        // 全プロジェクトの承認待ち提出物を取得
+        const allSubmissions = await Promise.all(
+          projects.map(project => getSubmissions(project.id, user.id))
+        )
+        
+        const flatSubmissions = allSubmissions.flat()
+        const pending = flatSubmissions.filter(s => s.status === 'submitted')
+        
+        setPendingSubmissions(pending)
+      } catch (error) {
+        console.error('Failed to fetch pending submissions:', error)
+      } finally {
+        setLoadingSubmissions(false)
+      }
+    }
+
+    fetchPendingSubmissions()
+  }, [user])
 
   // サンプルプロジェクトデータ（実際にはSupabaseから取得）
   const projects: Project[] = [
@@ -91,16 +124,6 @@ export default function ProjectsScreen() {
 
 
 
-  const getStatusColor = (status: Project['status']) => {
-    switch (status) {
-      case 'active': return Colors.accent.DEFAULT
-      case 'completed': return Colors.accent[600]
-      case 'paused': return Colors.semantic.warning
-      case 'planning': return Colors.accent[300]
-      default: return theme.text.secondary
-    }
-  }
-
   const getStatusText = (status: Project['status']) => {
     switch (status) {
       case 'active': return '進行中'
@@ -122,78 +145,111 @@ export default function ProjectsScreen() {
     router.push('/new-project')
   }
 
+  const handleApprovalScreen = () => {
+    router.push('/approval-center')
+  }
+
+  const renderApprovalSummaryCard = () => {
+    if (userRole !== 'owner' && userRole !== 'admin') {
+      return null // 代表のみ表示
+    }
+
+    const pendingCount = pendingSubmissions.length
+
+    return (
+      <TouchableOpacity
+        style={styles.approvalCard}
+        onPress={handleApprovalScreen}
+        activeOpacity={0.8}
+        accessibilityLabel={`承認待ち ${pendingCount}件`}
+        accessibilityHint="タップして承認画面を表示"
+      >
+        <View style={styles.approvalHeader}>
+          <Icon name="checkmark-circle" size={24} color="warning" />
+          <StyledText variant="title" weight="bold" color="warning">
+            承認待ち
+          </StyledText>
+        </View>
+        
+        <StyledText variant="heading2" weight="bold" color="primary" style={styles.approvalCount}>
+          {pendingCount}件
+        </StyledText>
+        
+        <StyledText variant="body" color="secondary">
+          職長からの提出物をご確認ください
+        </StyledText>
+
+        {loadingSubmissions && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
+            <StyledText variant="caption" color="secondary" style={{ marginLeft: 8 }}>
+              読み込み中...
+            </StyledText>
+          </View>
+        )}
+      </TouchableOpacity>
+    )
+  }
+
 
 
   const renderProjectCard = (project: Project) => (
     <TouchableOpacity
       key={project.id}
-      style={[styles.projectCard, getCardStyle(colorScheme)]}
+      style={styles.projectCard}
       onPress={() => handleProjectPress(project)}
       activeOpacity={0.8}
+      accessibilityLabel={`プロジェクト: ${project.name}`}
+      accessibilityHint="タップして詳細を表示"
     >
-      {/* Project Header with Name and Status */}
-      <View style={styles.projectHeader}>
-        <StyledText variant="title" weight="semibold" numberOfLines={1} style={{ color: theme.text.primary }}>
-          {project.name}
-        </StyledText>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(project.status) + '20' }]}>
-          <View style={[styles.statusDot, { backgroundColor: getStatusColor(project.status) }]} />
-          <StyledText 
-            variant="caption" 
-            weight="medium"
-            style={{ color: getStatusColor(project.status) }}
-          >
-            {getStatusText(project.status)}
-          </StyledText>
+      {/* プロジェクト名 */}
+      <StyledText variant="heading3" weight="semibold" numberOfLines={2} style={styles.projectName}>
+        {project.name}
+      </StyledText>
+      
+      {/* 主要指標を2行で表示 */}
+      <View style={styles.metricsContainer}>
+        {/* 1行目: 場所・進捗 */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricItem}>
+            <StyledText variant="caption" color="secondary" accessibilityLabel="場所">場所</StyledText>
+            <StyledText variant="body" weight="medium" numberOfLines={1} accessibilityLabel={`場所: ${project.location}`}>
+              {project.location}
+            </StyledText>
+          </View>
+          <View style={styles.metricItem}>
+            <StyledText variant="caption" color="secondary" accessibilityLabel="進捗">進捗</StyledText>
+            <StyledText variant="body" weight="bold" color="primary" accessibilityLabel={`進捗: ${project.progress}%`}>
+              {project.progress}%
+            </StyledText>
+          </View>
+        </View>
+        
+        {/* 2行目: 人数・今月コスト */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricItem}>
+            <StyledText variant="caption" color="secondary" accessibilityLabel="人数">人数</StyledText>
+            <StyledText variant="body" weight="medium" accessibilityLabel={`チーム人数: ${project.team.length}名`}>
+              {project.team.length}名
+            </StyledText>
+          </View>
+          <View style={styles.metricItem}>
+            <StyledText variant="caption" color="secondary" accessibilityLabel="今月コスト">今月コスト</StyledText>
+            <StyledText variant="body" weight="bold" accessibilityLabel={`今月コスト: ${project.monthlyCost > 0 ? `${(project.monthlyCost / 10000).toLocaleString()}万円` : 'なし'}`}>
+              {project.monthlyCost > 0 ? `¥${(project.monthlyCost / 10000).toLocaleString()}万` : '---'}
+            </StyledText>
+          </View>
         </View>
       </View>
 
-      {/* Key Information Grid */}
-      <View style={styles.infoGrid}>
-        {/* Location */}
-        <View style={styles.infoItem}>
-          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>📍 場所</StyledText>
-          <StyledText variant="body" weight="medium" style={{ color: theme.text.primary }}>
-            {project.location}
-          </StyledText>
-        </View>
-
-        {/* Progress */}
-        <View style={styles.infoItem}>
-          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>📊 進捗</StyledText>
-          <StyledText variant="body" weight="bold" style={{ color: Colors.accent.DEFAULT }}>
-            {project.progress}%
-          </StyledText>
-        </View>
-
-        {/* Team Count */}
-        <View style={styles.infoItem}>
-          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>👥 人数</StyledText>
-          <StyledText variant="body" weight="medium" style={{ color: theme.text.primary }}>
-            {project.team.length}名
-          </StyledText>
-        </View>
-
-        {/* Monthly Cost */}
-        <View style={styles.infoItem}>
-          <StyledText variant="caption" style={{ color: theme.text.tertiary }}>💰 今月コスト</StyledText>
-          <StyledText variant="body" weight="bold" style={{ color: theme.text.primary }}>
-            {project.monthlyCost > 0 ? `¥${(project.monthlyCost / 10000).toLocaleString()}万` : '---'}
-          </StyledText>
-        </View>
-      </View>
-
-      {/* Progress Bar */}
-      {project.status !== 'planning' && project.progress > 0 && (
+      {/* 進捗バー（PRIMARYアクセント色のみ） */}
+      {project.progress > 0 && (
         <View style={styles.progressContainer}>
-          <View style={[styles.progressBar, { backgroundColor: theme.border.light }]}>
+          <View style={styles.progressBar}>
             <View 
               style={[
                 styles.progressFill, 
-                { 
-                  width: `${project.progress}%`,
-                  backgroundColor: Colors.accent.DEFAULT
-                }
+                { width: `${project.progress}%` }
               ]} 
             />
           </View>
@@ -204,9 +260,7 @@ export default function ProjectsScreen() {
 
   const renderEmptyState = () => (
     <Card variant="outlined" style={styles.emptyCard}>
-      <StyledText variant="heading3" align="center" style={styles.emptyIcon}>
-        📋
-      </StyledText>
+      <Icon name="clipboard" size={48} color="textSecondary" style={styles.emptyIcon} />
       <StyledText variant="title" weight="semibold" align="center">
         プロジェクトがありません
       </StyledText>
@@ -215,18 +269,19 @@ export default function ProjectsScreen() {
       </StyledText>
       <StyledButton
         title="新規プロジェクト作成"
-        variant="success"
+        variant="primary"
         size="lg"
         elevated={true}
-        icon={<StyledText variant="title" color="onPrimary">🚀</StyledText>}
         onPress={handleNewProject}
         style={styles.emptyButton}
       />
     </Card>
   )
 
+  const styles = createStyles(colors, spacing, radius)
+  
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
+    <SafeAreaView style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -234,22 +289,27 @@ export default function ProjectsScreen() {
       >
         {/* ヘッダー */}
         <View style={styles.header}>
-          <StyledText variant="heading2" weight="bold" style={{ color: theme.text.primary }}>
+          <StyledText variant="heading2" weight="bold">
             現場一覧
           </StyledText>
-          <StyledText variant="body" style={{ color: theme.text.secondary }}>
+          <StyledText variant="body" color="secondary">
             案件名・場所・進捗・人数・コストを一覧表示
           </StyledText>
         </View>
 
-        {/* 新規作成ボタン - 大きく目立つボタン */}
+        {/* 承認待ちサマリーカード（代表のみ） */}
+        {renderApprovalSummaryCard()}
+
+        {/* 新規作成ボタン */}
         <TouchableOpacity
-          style={[styles.newProjectButton, { backgroundColor: Colors.accent.DEFAULT }]}
+          style={styles.newProjectButton}
           onPress={handleNewProject}
           activeOpacity={0.8}
+          accessibilityLabel="新規プロジェクト作成"
+          accessibilityHint="新しいプロジェクトを作成します"
         >
-          <StyledText variant="title" weight="bold" style={{ color: Colors.accent[50] }}>
-            ➕ 新規プロジェクト作成
+          <StyledText variant="title" weight="bold" color="onPrimary">
+            新規プロジェクト作成
           </StyledText>
         </TouchableOpacity>
 
@@ -262,98 +322,116 @@ export default function ProjectsScreen() {
           )}
         </View>
       </ScrollView>
+      
+      {/* 統一グローバルFAB */}
+      <GlobalFABMenu currentRoute="/(tabs)/projects" />
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, spacing: any, radius: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background.primary, // Will be overridden by theme
+    backgroundColor: colors.background.primary,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: spacing[4],
+    paddingBottom: spacing[8],
   },
   header: {
-    marginBottom: 24,
-    paddingTop: 8,
+    marginBottom: spacing[4],
+    paddingTop: spacing[1],
   },
   newProjectButton: {
-    marginBottom: 24,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    marginBottom: spacing[4],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
+    minHeight: 52,
+    backgroundColor: colors.primary.DEFAULT,
   },
   projectsList: {
-    gap: 16,
+    gap: spacing[3],
   },
   projectCard: {
-    padding: 16,
-    marginBottom: 8,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 140, // 1画面で3件表示用
   },
-  projectHeader: {
+  projectName: {
+    marginBottom: spacing[3],
+    color: colors.text.primary,
+    minHeight: 48, // 2行分の高さを確保
+  },
+  metricsContainer: {
+    flex: 1,
+    gap: spacing[3],
+  },
+  metricsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    gap: 12,
+    gap: spacing[4],
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-    flexShrink: 0,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-    gap: 12,
-  },
-  infoItem: {
-    width: '48%',
-    minWidth: 120,
+  metricItem: {
+    flex: 1,
+    gap: spacing[1],
   },
   progressContainer: {
-    marginTop: 8,
+    marginTop: spacing[3],
   },
   progressBar: {
     height: 6,
-    borderRadius: 3,
+    borderRadius: radius.sm,
+    backgroundColor: colors.border,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary.DEFAULT,
   },
   emptyCard: {
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingVertical: spacing[12],
   },
   emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+    marginBottom: spacing[4],
   },
   emptyDescription: {
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: spacing[2],
+    marginBottom: spacing[6],
   },
   emptyButton: {
     minWidth: 200,
+  },
+  approvalCard: {
+    backgroundColor: colors.warning.light || colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.warning.DEFAULT,
+  },
+  approvalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[2],
+    gap: spacing[2],
+  },
+  approvalCount: {
+    marginBottom: spacing[1],
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing[2],
   },
 })

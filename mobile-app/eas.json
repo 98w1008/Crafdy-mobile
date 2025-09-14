@@ -1,0 +1,6 @@
+{
+  "cli": { "appVersionSource": "remote" },
+  "build": {
+    "simulator": { "ios": { "simulator": true } }
+  }
+}

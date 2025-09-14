@@ -19,3 +19,9 @@
 - プロジェクト名: Crafdy-mobile
 - 設定日: 2025-06-27
 - Claude Codeがエディタ内でチャット機能として統合済み
+
+##　デザイン
+- https://atlassian.design/components
+
+## 対話言語
+- 日本語で対話してください

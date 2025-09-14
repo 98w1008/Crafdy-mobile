@@ -13,8 +13,13 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { useAuth, useRole } from '@/contexts/AuthContext'
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/GrayDesignTokens'
+import { useColors, useSpacing, useRadius } from '@/theme/ThemeProvider'
 import { StyledText, StyledButton } from '@/components/ui'
+import GreetingCard from '@/components/GreetingCard'
+import WelcomeCard from '@/components/chat/WelcomeCard'
+import MessageBubble from '@/components/chat/MessageBubble'
+import { useGreetingCard } from '@/hooks/useGreetingCard'
+import GlobalFABMenu from '@/components/chat/FabActions'
 import * as Haptics from 'expo-haptics'
 
 const { width: screenWidth } = Dimensions.get('window')
@@ -54,11 +59,28 @@ interface SlashCommand {
 export default function ChatHomeScreen() {
   const { user, profile } = useAuth()
   const userRole = useRole()
+  const colors = useColors()
+  const spacing = useSpacing()
+  const radius = useRadius()
+  
   const [inputText, setInputText] = useState('')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [showSlashCommands, setShowSlashCommands] = useState(false)
+  const [currentSite, setCurrentSite] = useState('新築現場 A棟')
+  const [showWelcomeCard, setShowWelcomeCard] = useState(true)
   const scrollViewRef = useRef<ScrollView>(null)
   const inputRef = useRef<TextInput>(null)
+
+  // 挨拶カード管理
+  const { 
+    isVisible: showGreeting,
+    hideCard: hideGreeting,
+    onFocus,
+    onChangeText: handleGreetingTextChange,
+    onScroll,
+    onPress: hideGreetingOnPress,
+    isLoading: greetingLoading
+  } = useGreetingCard()
 
   // おすすめプロンプトチップ
   const promptChips: PromptChip[] = [
@@ -66,37 +88,37 @@ export default function ChatHomeScreen() {
       id: '1',
       text: '今日の現場を新規作成',
       category: 'project',
-      icon: '🏗️'
+      icon: '・'
     },
     {
       id: '2', 
       text: '日報を記録',
       category: 'report',
-      icon: '📝'
+      icon: '・'
     },
     {
       id: '3',
       text: 'レシートを撮影',
       category: 'media',
-      icon: '📷'
+      icon: '・'
     },
     {
       id: '4',
       text: '進捗を%で更新',
       category: 'project',
-      icon: '📊'
+      icon: '・'
     },
     {
       id: '5',
       text: '見積をAIで草案',
       category: 'estimate', 
-      icon: '💰'
+      icon: '・'
     },
     {
       id: '6',
       text: '応援を手配',
       category: 'support',
-      icon: '⚡'
+      icon: '・'
     }
   ]
 
@@ -165,6 +187,8 @@ export default function ChatHomeScreen() {
     if (Haptics) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
+    hideGreetingOnPress() // タップ時に挨拶カード非表示
+    setShowWelcomeCard(false) // ウェルカムカード非表示
     setInputText(chip.text)
     inputRef.current?.focus()
   }
@@ -172,6 +196,9 @@ export default function ChatHomeScreen() {
   // メッセージ送信
   const handleSendMessage = () => {
     if (!inputText.trim()) return
+
+    hideGreetingOnPress() // メッセージ送信時に挨拶カード非表示
+    setShowWelcomeCard(false) // ウェルカムカード非表示
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -230,6 +257,7 @@ export default function ChatHomeScreen() {
   const handleTextChange = (text: string) => {
     setInputText(text)
     setShowSlashCommands(text.startsWith('/'))
+    handleGreetingTextChange(text) // 挨拶カード非表示処理
   }
 
   // マルチメディア入力のハンドラ
@@ -257,12 +285,29 @@ export default function ChatHomeScreen() {
   // 未完タスクの数（仮データ）
   const pendingTasksCount = 3
 
+  // ウェルカムカードレンダリング
+  const renderWelcomeCard = () => {
+    if (greetingLoading || !showGreeting || !showWelcomeCard) return null
+    
+    return (
+      <WelcomeCard
+        userName={profile?.full_name || user?.email?.split('@')[0] || 'ユーザー'}
+        siteName={currentSite}
+        visible={showWelcomeCard && showGreeting}
+        onHide={() => {
+          setShowWelcomeCard(false)
+          hideGreeting()
+        }}
+      />
+    )
+  }
+
   // ヘッダーレンダリング
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerContent}>
         <StyledText variant="title" weight="semibold" color="text">
-          お疲れ様です、{profile?.full_name || 'ユーザー'}さん 👋
+          お疲れ様です、{profile?.full_name || 'ユーザー'}さん
         </StyledText>
         {pendingTasksCount > 0 && (
           <View style={styles.taskBadge}>
@@ -293,7 +338,7 @@ export default function ChatHomeScreen() {
             onPress={() => handleChipPress(chip)}
             activeOpacity={0.7}
           >
-            <StyledText variant="body" style={{ marginRight: Spacing.xs }}>
+            <StyledText variant="body" color="primary" style={{ marginRight: spacing[1] }}>
               {chip.icon}
             </StyledText>
             <StyledText variant="body" weight="medium" color="primary">
@@ -310,55 +355,16 @@ export default function ChatHomeScreen() {
     const isUser = message.type === 'user'
     
     return (
-      <View key={message.id} style={[
-        styles.messageContainer,
-        isUser ? styles.userMessageContainer : styles.aiMessageContainer
-      ]}>
-        <View style={[
-          styles.messageBubble,
-          isUser ? styles.userBubble : styles.aiBubble
-        ]}>
-          <StyledText 
-            variant="body" 
-            color={isUser ? 'onPrimary' : 'text'}
-            style={styles.messageText}
-          >
-            {message.content}
-          </StyledText>
-          
-          {/* AIメッセージのアクションボタン */}
-          {!isUser && message.actions && message.actions.length > 0 && (
-            <View style={styles.messageActions}>
-              {message.actions.map((action) => (
-                <TouchableOpacity
-                  key={action.id}
-                  style={[
-                    styles.actionButton,
-                    action.variant === 'secondary' ? styles.secondaryActionButton : styles.primaryActionButton
-                  ]}
-                  onPress={action.action}
-                  activeOpacity={0.7}
-                >
-                  <StyledText 
-                    variant="caption" 
-                    weight="semibold"
-                    color={action.variant === 'secondary' ? 'primary' : 'onPrimary'}
-                  >
-                    {action.label}
-                  </StyledText>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-        
-        <StyledText variant="caption" color="tertiary" style={styles.messageTime}>
-          {message.timestamp.toLocaleTimeString('ja-JP', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })}
-        </StyledText>
-      </View>
+      <MessageBubble
+        key={message.id}
+        message={message.content}
+        isUser={isUser}
+        timestamp={message.timestamp.toLocaleTimeString('ja-JP', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })}
+        actions={message.actions}
+      />
     )
   }
 
@@ -409,8 +415,9 @@ export default function ChatHomeScreen() {
             style={styles.textInput}
             value={inputText}
             onChangeText={handleTextChange}
+            onFocus={onFocus}
             placeholder="メッセージを入力...（/でコマンド）"
-            placeholderTextColor={Colors.text.tertiary}
+            placeholderTextColor={colors.text.secondary}
             multiline
             maxLength={500}
           />
@@ -425,10 +432,10 @@ export default function ChatHomeScreen() {
                 'メディア選択',
                 'どの機能を使用しますか？',
                 [
-                  { text: '📷 写真', onPress: () => handleMediaInput('photo') },
-                  { text: '📄 スキャン', onPress: () => handleMediaInput('scan') },
-                  { text: '📍 位置情報', onPress: () => handleMediaInput('location') },
-                  { text: '🎤 音声', onPress: () => handleMediaInput('voice') },
+                  { text: '写真', onPress: () => handleMediaInput('photo') },
+                  { text: 'スキャン', onPress: () => handleMediaInput('scan') },
+                  { text: '位置情報', onPress: () => handleMediaInput('location') },
+                  { text: '音声', onPress: () => handleMediaInput('voice') },
                   { text: 'キャンセル', style: 'cancel' }
                 ]
               )
@@ -457,6 +464,8 @@ export default function ChatHomeScreen() {
     </View>
   )
 
+  const styles = createStyles(colors, spacing, radius)
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
@@ -477,177 +486,131 @@ export default function ChatHomeScreen() {
           contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          onScroll={onScroll}
         >
+          {/* ウェルカムカード */}
+          {renderWelcomeCard()}
+          
           {chatMessages.map(renderChatMessage)}
         </ScrollView>
         
         {/* 入力エリア */}
         {renderInputArea()}
+        
+        {/* 統一グローバルFAB */}
+        <GlobalFABMenu currentRoute="/(tabs)" />
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, spacing: any, radius: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.base.background,
+    backgroundColor: colors.background.primary,
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   header: {
-    padding: Spacing.lg,
-    backgroundColor: Colors.base.surface,
+    padding: spacing[6],
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: colors.border,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.xs,
+    marginBottom: spacing[1],
   },
   taskBadge: {
-    backgroundColor: Colors.primary.DEFAULT,
+    backgroundColor: colors.primary.DEFAULT,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.xs,
+    paddingHorizontal: spacing[1],
   },
   promptChipsContainer: {
-    backgroundColor: Colors.base.surface,
-    paddingVertical: Spacing.md,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: colors.border,
   },
   promptChipsContent: {
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
+    paddingHorizontal: spacing[4],
+    gap: spacing[2],
   },
   promptChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primary.alpha[10],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    backgroundColor: colors.background.secondary,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: Colors.primary[200],
+    borderColor: colors.primary.DEFAULT,
   },
   chatArea: {
     flex: 1,
   },
   chatContent: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
+    padding: spacing[4],
+    gap: spacing[3],
   },
-  messageContainer: {
-    maxWidth: '85%',
-  },
-  userMessageContainer: {
-    alignSelf: 'flex-end',
-    alignItems: 'flex-end',
-  },
-  aiMessageContainer: {
-    alignSelf: 'flex-start',
-    alignItems: 'flex-start',
-  },
-  messageBubble: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.xs,
-    maxWidth: '100%',
-    ...Shadows.sm,
-  },
-  userBubble: {
-    backgroundColor: Colors.primary.DEFAULT,
-    borderBottomRightRadius: 6,
-  },
-  aiBubble: {
-    backgroundColor: Colors.base.surface,
-    borderBottomLeftRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  messageText: {
-    lineHeight: Typography?.sizes?.base ?? 16 * 1.4,
-  },
-  messageActions: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
-    flexWrap: 'wrap',
-  },
-  actionButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-  },
-  primaryActionButton: {
-    backgroundColor: Colors.primary.DEFAULT,
-  },
-  secondaryActionButton: {
-    backgroundColor: Colors.base.surface,
-    borderWidth: 1,
-    borderColor: Colors.primary.DEFAULT,
-  },
-  messageTime: {
-    marginLeft: Spacing.xs,
-  },
+  // メッセージ関連のスタイルはMessageBubbleコンポーネントに移動済み
   slashCommandsContainer: {
-    backgroundColor: Colors.base.surface,
-    borderRadius: BorderRadius.lg,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
-    ...Shadows.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    marginHorizontal: spacing[4],
+    marginBottom: spacing[2],
     maxHeight: 200,
   },
   slashCommandItem: {
-    padding: Spacing.md,
+    padding: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: colors.border,
   },
   inputContainer: {
-    backgroundColor: Colors.base.surface,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-    padding: Spacing.lg,
+    borderTopColor: colors.border,
+    padding: spacing[4],
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: Spacing.sm,
+    gap: spacing[2],
   },
   textInputContainer: {
     flex: 1,
-    backgroundColor: Colors.base.surfaceSubtle,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: colors.background.secondary,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: Colors.border.light,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    borderColor: colors.border,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
     minHeight: 44,
     maxHeight: 120,
   },
   textInput: {
-    fontSize: Typography?.sizes?.base ?? 16,
-    color: Colors.text.primary,
+    fontSize: 16,
+    color: colors.text.primary,
     textAlignVertical: 'center',
   },
   inputActions: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: spacing[2],
   },
   mediaButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.base.surfaceSubtle,
+    backgroundColor: colors.background.secondary,
     borderWidth: 1,
-    borderColor: Colors.border.light,
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -659,11 +622,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButtonActive: {
-    backgroundColor: Colors.primary.DEFAULT,
+    backgroundColor: colors.primary.DEFAULT,
   },
   sendButtonInactive: {
-    backgroundColor: Colors.base.surfaceSubtle,
+    backgroundColor: colors.background.secondary,
     borderWidth: 1,
-    borderColor: Colors.border.light,
+    borderColor: colors.border,
   },
 })

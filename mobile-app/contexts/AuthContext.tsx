@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { Session, User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseReady } from '@/lib/supabase'
 
 type UserRole = 'parent' | 'lead' | 'worker'
 
@@ -53,51 +53,51 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
-      console.log('🔍 Fetching user profile for:', userId)
-      
       const { data, error } = await supabase
-        .from('profiles')
+        .from('profiles')              // users ではなく profiles を参照
         .select('*')
-        .eq('id', userId)
-        .single()
+        .eq('user_id', userId)
+        .maybeSingle()                 // 0件でもエラーにしない
 
       if (error) {
-        console.error('❌ Error fetching profile:', error)
+        console.warn('⚠️ fetchUserProfile failed:', error)
         return null
       }
 
-      if (!data) {
-        console.log('⚠️ No profile found, creating basic profile')
-        return {
-          id: userId,
-          full_name: null,
-          email: user?.email || '',
-          role: 'parent' as UserRole,
-          company: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      }
+      if (!data) return null
 
       const userProfile: UserProfile = {
-        id: data.id,
-        full_name: data.full_name,
+        id: data.user_id,
+        full_name: (data as any).full_name ?? null,
         email: data.email || user?.email || '',
-        role: data.role || 'parent',
-        company: data.company,
-        daily_rate: data.daily_rate,
-        is_active: data.is_active !== false,
-        created_at: data.created_at,
-        updated_at: data.updated_at
+        role: (data as any).role || 'parent',
+        company: (data as any).company ?? null,
+        daily_rate: (data as any).daily_rate,
+        is_active: (data as any).is_active !== false,
+        created_at: (data as any).created_at || new Date().toISOString(),
+        updated_at: (data as any).updated_at || new Date().toISOString(),
       }
-      
-      console.log('✅ Profile fetched successfully:', userProfile.role)
       return userProfile
-      
     } catch (error) {
-      console.error('❌ Error in fetchUserProfile:', error)
+      console.warn('⚠️ Error in fetchUserProfile:', error)
       return null
+    }
+  }
+
+  const ensureProfile = async (userId: string, email?: string) => {
+    if (!supabase) return
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!data) {
+      await supabase.from('user_profiles').insert({ 
+        user_id: userId, 
+        display_name: (email||'').split('@')[0], 
+        role: 'worker'
+      })
     }
   }
 
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('❌ Error fetching project access:', error)
+        console.warn('⚠️ fetchProjectAccess failed:', error)
         return []
       }
 
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return accessList
       
     } catch (error) {
-      console.error('❌ Error in fetchProjectAccess:', error)
+      console.warn('⚠️ Error in fetchProjectAccess:', error)
       return []
     }
   }
@@ -176,6 +176,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let mounted = true
 
+    // Supabase未準備なら監視をスキップ
+    if (!supabase || !supabaseReady) {
+      setLoading(false)
+      return () => {}
+    }
+
     // 認証状態の変更を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
@@ -187,7 +193,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(currentSession)
           setUser(currentSession.user)
           
-          // プロファイルとプロジェクトアクセスを取得
+          // プロファイル確保とプロジェクトアクセスを取得
+          await ensureProfile(currentSession.user.id, currentSession.user.email)
           const [userProfile, access] = await Promise.all([
             fetchUserProfile(currentSession.user.id),
             fetchProjectAccess(currentSession.user.id)
@@ -216,7 +223,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error('❌ Error getting session:', error)
+          console.warn('⚠️ Error getting session:', error)
           if (mounted) setLoading(false)
           return
         }
@@ -226,7 +233,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(session)
           setUser(session.user)
           
-          // プロファイルとプロジェクトアクセスを取得
+          // プロファイル確保とプロジェクトアクセスを取得
+          await ensureProfile(session.user.id, session.user.email)
           const [userProfile, access] = await Promise.all([
             fetchUserProfile(session.user.id),
             fetchProjectAccess(session.user.id)
@@ -242,7 +250,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setLoading(false)
         }
       } catch (error) {
-        console.error('❌ Error in getInitialSession:', error)
+        console.warn('⚠️ Error in getInitialSession:', error)
         if (mounted) setLoading(false)
       }
     }
@@ -260,9 +268,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('🔐 Signing out...')
       setLoading(true)
       
+      if (!supabase) {
+        console.warn('⚠️ Supabase not initialized')
+        return
+      }
+      
       const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error('❌ Error signing out:', error)
+        console.warn('⚠️ Error signing out:', error)
         throw error
       }
       
@@ -274,7 +287,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       console.log('✅ Successfully signed out')
     } catch (error) {
-      console.error('❌ Error during sign out:', error)
+      console.warn('⚠️ Error during sign out:', error)
       throw error
     } finally {
       setLoading(false)
@@ -305,7 +318,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    // Provider外で呼ばれた場合でも赤帯を出さない安全ガード
+    return {
+      user: null,
+      session: null,
+      profile: null,
+      projectAccess: [],
+      loading: true,
+      signOut: async () => {},
+      refreshProfile: async () => {},
+      refreshProjectAccess: async () => {},
+      hasProjectAccess: () => false,
+      isParent: () => false,
+      isLead: () => false,
+    }
   }
   return context
 }

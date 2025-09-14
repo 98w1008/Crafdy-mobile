@@ -2,5 +2,17 @@
   "persistLogin": true,
   "rememberSession": true,
   "autoSave": true,
-  "integrationMode": "vscode"
+  "integrationMode": "vscode",
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+      "transport": "stdio"
+    },
+    "supabase": {
+      "command": "bash",
+      "args": ["-lc", "/Users/watanabekuuya/Crafdy-mobile/mobile-app/scripts/mcp-supabase.sh"],
+      "transport": "stdio"
+    }
+  }
 }

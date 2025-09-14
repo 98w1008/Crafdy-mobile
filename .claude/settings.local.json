@@ -15,7 +15,27 @@
       "Bash(. \"$NVM_DIR/nvm.sh\")",
       "Bash(npx expo start:*)",
       "Bash(pkill:*)",
-      "Bash(npm run start-lan:*)"
+      "Bash(npm run start-lan:*)",
+      "Bash(ls:*)",
+      "Bash(npx expo r:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx expo export:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npx pod-install:*)",
+      "Bash(pod install:*)",
+      "mcp__ide__getDiagnostics",
+      "mcp__ide__executeCode",
+      "Bash(npm run start:*)",
+      "Bash(npm run clean:metro:*)",
+      "Bash(npx expo:*)",
+      "Bash(npm run lint)",
+      "Bash(chmod:*)",
+      "Bash(npx eslint:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }

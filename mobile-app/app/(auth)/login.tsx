@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native'
-import { supabase } from '../../src/lib/supabase'
+import { supabase, supabaseReady } from '@/lib/supabase'
 import { router } from 'expo-router'
 
 export default function LoginScreen() {
@@ -8,7 +8,15 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // ボタンの反応性を担保するため、supabaseReady では無効化しない
+  const canLogin = !!email && !!password
+
   const handleLogin = async () => {
+    if (!canLogin) return
+    if (!supabaseReady || !supabase) {
+      Alert.alert('環境設定が未完了', 'EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY を設定してください')
+      return
+    }
     if (!email || !password) {
       Alert.alert('エラー', 'メールアドレスとパスワードを入力してください')
       return
@@ -16,7 +24,7 @@ export default function LoginScreen() {
 
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase!.auth.signInWithPassword({
         email,
         password,
       })
@@ -24,7 +32,7 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert('ログインエラー', error.message)
       } else {
-        router.replace('/(tabs)')
+        router.replace('/main-chat')
       }
     } catch (error) {
       Alert.alert('エラー', 'ログインに失敗しました')
@@ -36,6 +44,7 @@ export default function LoginScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
+        
         {/* Logo Section */}
         <View style={styles.logoSection}>
           <View style={styles.logo}>
@@ -73,9 +82,9 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[styles.button, (loading || !canLogin) && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || !canLogin}
           >
             <Text style={styles.buttonText}>
               {loading ? 'ログイン中...' : 'ログイン'}
@@ -93,7 +102,22 @@ export default function LoginScreen() {
             onPress={() => router.push('/(auth)/signup')}
           >
             <Text style={styles.linkText}>
-              アカウントを作成する
+              親方・代表アカウントを作成
+            </Text>
+          </TouchableOpacity>
+
+          {!supabaseReady && (
+            <Text style={{ marginTop: 8, color: '#EF4444', textAlign: 'center' }}>
+              環境設定が未完了です。EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY を設定してください。
+            </Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => router.push('/(auth)/signup-with-code')}
+          >
+            <Text style={styles.linkText}>
+              招待コードで職長登録
             </Text>
           </TouchableOpacity>
         </View>

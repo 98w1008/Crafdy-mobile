@@ -1,28 +1,21 @@
-import 'react-native-url-polyfill/auto'
 import { createClient } from '@supabase/supabase-js'
-import * as SecureStore from 'expo-secure-store'
+import Constants from 'expo-constants'
 
-const supabaseUrl = 'https://aerscsgzulqfsecltyjz.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlcnNjc2d6dWxxZnNlY2x0eWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1MDk1NjQsImV4cCI6MjA2NjA4NTU2NH0.uNl3O7WzSQm-ud2OIjs7SV6jrqVdDSmeG6cvFoKA94I'
+// Prefer EXPO_PUBLIC_* (bundler) and fall back to app.config.js extra
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL
+  || (Constants?.expoConfig as any)?.extra?.supabaseUrl
+  || ''
+const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+  || (Constants?.expoConfig as any)?.extra?.supabaseAnonKey
+  || ''
 
-// SecureStoreを使ったセッション永続化
-const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => {
-    return SecureStore.getItemAsync(key)
-  },
-  setItem: (key: string, value: string) => {
-    SecureStore.setItemAsync(key, value)
-  },
-  removeItem: (key: string) => {
-    SecureStore.deleteItemAsync(key)
-  },
+const isValidJwt = (t: string) =>
+  /^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/.test(t)
+
+export const supabaseReady = !!url && !!anon && isValidJwt(anon)
+
+if (!supabaseReady) {
+  console.warn('[supabase] Missing or invalid env. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (JWT).')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: ExpoSecureStoreAdapter,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-})
+export const supabase = supabaseReady ? createClient(url, anon) : null

@@ -1,11 +1,21 @@
+/**
+ * 見積管理画面 - Task 6統合版
+ * 統合アップロード・AI自動判別対応の見積作成機能を統合
+ */
+
 import React, { useEffect, useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { EstimateNavigationHub } from '@/components/EstimateNavigationHub'
+import { StyledText, Card } from '@/components/ui'
+import { useColors, useSpacing } from '@/theme/ThemeProvider'
 
 export default function EstimatesScreen() {
   const [estimates, setEstimates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const colors = useColors()
+  const spacing = useSpacing()
 
   useEffect(() => {
     fetchEstimates()
@@ -61,416 +71,252 @@ export default function EstimatesScreen() {
     }
   }
 
-  const generateEstimate = async () => {
-    Alert.alert(
-      'AI見積作成',
-      'AI見積機能はまだ実装中です。\n近日公開予定です。',
-      [{ text: 'OK' }]
-    )
-  }
-
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>読み込み中...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <StyledText variant="body">読み込み中...</StyledText>
+        </View>
+      </SafeAreaView>
     )
   }
 
+  const styles = createStyles(colors, spacing)
+
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>見積管理</Text>
-        <TouchableOpacity style={styles.addButton} onPress={generateEstimate}>
-          <Text style={styles.addButtonText}>+ AI見積</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content}>
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{estimates.length}</Text>
-            <Text style={styles.statLabel}>総見積数</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              {estimates.filter(e => e.status === 'approved').length}
-            </Text>
-            <Text style={styles.statLabel}>承認済み</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              ¥{estimates
-                .filter(e => e.status === 'approved')
-                .reduce((sum, e) => sum + (e.total_amount || 0), 0)
-                .toLocaleString()}
-            </Text>
-            <Text style={styles.statLabel}>承認金額</Text>
-          </View>
-        </View>
-
-        {estimates.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📊</Text>
-            <Text style={styles.emptyTitle}>見積がありません</Text>
-            <Text style={styles.emptyDescription}>
-              AIを使って見積を作成したり、{'\n'}
-              OCRでレシートを読み取って{'\n'}
-              見積データを管理しましょう
-            </Text>
-            <TouchableOpacity style={styles.createButton} onPress={generateEstimate}>
-              <Text style={styles.createButtonText}>AI見積を作成</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.estimateList}>
-            {estimates.map((estimate) => (
-              <TouchableOpacity 
-                key={estimate.id} 
-                style={styles.estimateCard}
-                onPress={() => console.log(`見積 ${estimate.id} の詳細表示機能は開発中です`)}
-              >
-                <View style={styles.estimateHeader}>
-                  <View style={styles.estimateInfo}>
-                    <Text style={styles.estimateTitle}>{estimate.title}</Text>
-                    <Text style={styles.projectName}>
-                      {estimate.projects?.name || '未分類'}
-                    </Text>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(estimate.status) + '20' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(estimate.status) }]}>
-                      {getStatusLabel(estimate.status)}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.estimateDetails}>
-                  <View style={styles.amountContainer}>
-                    <Text style={styles.amountLabel}>見積金額</Text>
-                    <Text style={styles.amountValue}>
-                      ¥{estimate.total_amount?.toLocaleString() || '0'}
-                    </Text>
-                  </View>
-                  
-                  {estimate.description && (
-                    <Text style={styles.estimateDescription} numberOfLines={2}>
-                      {estimate.description}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.estimateFooter}>
-                  <Text style={styles.dateText}>
-                    作成日: {new Date(estimate.created_at).toLocaleDateString('ja-JP')}
-                  </Text>
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity 
-                      style={styles.editButton}
-                      onPress={() => console.log(`見積 ${estimate.id} の編集機能は開発中です`)}
-                    >
-                      <Text style={styles.editButtonText}>編集</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.viewButton}
-                      onPress={() => console.log(`見積 ${estimate.id} の詳細表示機能は開発中です`)}
-                    >
-                      <Text style={styles.viewButtonText}>詳細 →</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Task 6: 統合見積作成ナビゲーション */}
+        <EstimateNavigationHub 
+          onOptionSelect={(optionId) => {
+            console.log('選択されたオプション:', optionId)
+          }}
+          showRecentProjects={estimates.length > 0}
+        />
+        
+        {/* 統計カード */}
+        {estimates.length > 0 && (
+          <Card style={styles.statsCard}>
+            <StyledText variant="subtitle" weight="semibold" style={styles.statsTitle}>
+              📊 見積統計
+            </StyledText>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <StyledText variant="title" weight="bold" color="primary">
+                  {estimates.length}
+                </StyledText>
+                <StyledText variant="caption" color="secondary">総見積数</StyledText>
+              </View>
+              <View style={styles.statItem}>
+                <StyledText variant="title" weight="bold" color="success">
+                  {estimates.filter(e => e.status === 'approved').length}
+                </StyledText>
+                <StyledText variant="caption" color="secondary">承認済み</StyledText>
+              </View>
+              <View style={styles.statItem}>
+                <StyledText variant="body" weight="bold" color="primary">
+                  ¥{estimates
+                    .filter(e => e.status === 'approved')
+                    .reduce((sum, e) => sum + (e.total_amount || 0), 0)
+                    .toLocaleString()}
+                </StyledText>
+                <StyledText variant="caption" color="secondary">承認金額</StyledText>
+              </View>
+            </View>
+          </Card>
         )}
 
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <Text style={styles.quickActionsTitle}>クイックアクション</Text>
-          <View style={styles.actionGrid}>
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={() => console.log('OCR読取機能は開発中です')}
-            >
-              <Text style={styles.actionIcon}>📄</Text>
-              <Text style={styles.actionTitle}>OCR読取</Text>
-              <Text style={styles.actionDescription}>レシートから見積作成</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={generateEstimate}
-            >
-              <Text style={styles.actionIcon}>🤖</Text>
-              <Text style={styles.actionTitle}>AI見積</Text>
-              <Text style={styles.actionDescription}>AIが自動で見積作成</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={() => console.log('テンプレート機能は開発中です')}
-            >
-              <Text style={styles.actionIcon}>📋</Text>
-              <Text style={styles.actionTitle}>テンプレート</Text>
-              <Text style={styles.actionDescription}>よく使う見積を保存</Text>
-            </TouchableOpacity>
+        {/* 最近の見積一覧 */}
+        {estimates.length > 0 && (
+          <Card style={styles.recentEstimatesCard}>
+            <View style={styles.recentHeader}>
+              <StyledText variant="subtitle" weight="semibold">
+                🗓️ 最近の見積
+              </StyledText>
+              <TouchableOpacity onPress={() => router.push('/estimates/history')}>
+                <StyledText variant="body" color="primary">
+                  すべて表示 →
+                </StyledText>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.estimateList}>
+              {estimates.slice(0, 5).map((estimate) => (
+                <TouchableOpacity 
+                  key={estimate.id} 
+                  style={styles.estimateItem}
+                  onPress={() => console.log(`見積 ${estimate.id} の詳細表示機能は開発中です`)}
+                >
+                  <View style={styles.estimateInfo}>
+                    <StyledText variant="body" weight="medium" numberOfLines={1}>
+                      {estimate.title}
+                    </StyledText>
+                    <StyledText variant="caption" color="secondary">
+                      {estimate.projects?.name || '未分類'} • {new Date(estimate.created_at).toLocaleDateString('ja-JP')}
+                    </StyledText>
+                  </View>
+                  <View style={styles.estimateAmount}>
+                    <StyledText variant="body" weight="medium">
+                      ¥{(estimate.total_amount || 0).toLocaleString()}
+                    </StyledText>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(estimate.status) + '20' }]}>
+                      <StyledText 
+                        variant="caption" 
+                        weight="medium"
+                        style={[{ color: getStatusColor(estimate.status) }]}
+                      >
+                        {getStatusLabel(estimate.status)}
+                      </StyledText>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Card>
+        )}
+
+        {/* Task 6 機能紹介 */}
+        <Card style={styles.featureCard}>
+          <StyledText variant="subtitle" weight="semibold" style={styles.featureTitle}>
+            🚀 新機能: AI統合見積システム
+          </StyledText>
+          <StyledText variant="body" color="secondary" style={styles.featureDescription}>
+            Task 6で実装された最新機能をお試しください
+          </StyledText>
+          
+          <View style={styles.featureList}>
+            <View style={styles.featureItem}>
+              <StyledText variant="body">📁</StyledText>
+              <View style={styles.featureContent}>
+                <StyledText variant="body" weight="medium">統合アップロード</StyledText>
+                <StyledText variant="caption" color="secondary">
+                  図面・仕様書・写真を一括アップロード
+                </StyledText>
+              </View>
+            </View>
+            <View style={styles.featureItem}>
+              <StyledText variant="body">🤖</StyledText>
+              <View style={styles.featureContent}>
+                <StyledText variant="body" weight="medium">AI自動判別</StyledText>
+                <StyledText variant="caption" color="secondary">
+                  ドキュメント内容を自動解析して見積に反映
+                </StyledText>
+              </View>
+            </View>
+            <View style={styles.featureItem}>
+              <StyledText variant="body">⚡</StyledText>
+              <View style={styles.featureContent}>
+                <StyledText variant="body" weight="medium">スマート事前入力</StyledText>
+                <StyledText variant="caption" color="secondary">
+                  AI解析結果から自動で見積項目を生成
+                </StyledText>
+              </View>
+            </View>
           </View>
-        </View>
+        </Card>
+
+        {/* 空間調整用の余白 */}
+        <View style={{ height: spacing[6] }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
+// =============================================================================
+// STYLES
+// =============================================================================
+
+const createStyles = (colors: any, spacing: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background.primary,
   },
-  centerContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
   },
-  header: {
-    backgroundColor: 'white',
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  addButton: {
-    backgroundColor: '#10b981',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  content: {
+  scrollView: {
     flex: 1,
-    padding: 24,
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
+  statsCard: {
+    margin: spacing[4],
+    marginTop: 0,
+    padding: spacing[5],
+  },
+  statsTitle: {
+    marginBottom: spacing[4],
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
+    justifyContent: 'space-around',
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+  statItem: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    gap: spacing[2],
   },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
+  recentEstimatesCard: {
+    margin: spacing[4],
+    marginTop: 0,
+    padding: spacing[5],
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 80,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 24,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
-  },
-  createButton: {
-    backgroundColor: '#10b981',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  createButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  estimateList: {
-    gap: 16,
-    marginBottom: 32,
-  },
-  estimateCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  estimateHeader: {
+  recentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: spacing[4],
+  },
+  estimateList: {
+    gap: spacing[3],
+  },
+  estimateItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   estimateInfo: {
     flex: 1,
-    marginRight: 12,
+    gap: spacing[1],
   },
-  estimateTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  projectName: {
-    fontSize: 14,
-    color: '#6b7280',
+  estimateAmount: {
+    alignItems: 'flex-end',
+    gap: spacing[2],
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
     borderRadius: 12,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+  featureCard: {
+    margin: spacing[4],
+    marginTop: 0,
+    padding: spacing[5],
+    backgroundColor: colors.primary.DEFAULT + '10',
+    borderColor: colors.primary.DEFAULT,
+    borderWidth: 1,
   },
-  estimateDetails: {
-    marginBottom: 16,
+  featureTitle: {
+    marginBottom: spacing[2],
   },
-  amountContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  amountLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  amountValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  estimateDescription: {
-    fontSize: 14,
-    color: '#6b7280',
+  featureDescription: {
+    marginBottom: spacing[4],
     lineHeight: 20,
   },
-  estimateFooter: {
+  featureList: {
+    gap: spacing[4],
+  },
+  featureItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing[3],
   },
-  dateText: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  editButtonText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  viewButton: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  viewButtonText: {
-    fontSize: 12,
-    color: '#10b981',
-    fontWeight: '600',
-  },
-  quickActions: {
-    marginTop: 24,
-  },
-  quickActionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  actionGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionCard: {
+  featureContent: {
     flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  actionDescription: {
-    fontSize: 10,
-    color: '#6b7280',
-    textAlign: 'center',
+    gap: spacing[1],
   },
 })

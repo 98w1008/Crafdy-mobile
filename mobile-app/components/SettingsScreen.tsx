@@ -9,11 +9,23 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useAuth, useRole } from '@/contexts/AuthContext'
-import { useStripe } from '@stripe/stripe-react-native'
+// Stripe hook - Web環境では条件付きで無効化
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase'
 import { router } from 'expo-router'
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/GrayDesignTokens'
 import { StyledText, StyledButton, Card } from '@/components/ui'
+import { useTheme, useColors, useSpacing, useRadius, type ThemeMode } from '@/theme/ThemeProvider'
+import GlobalFABMenu from '@/components/chat/FabActions'
+let useStripe: any = () => ({ initPaymentSheet: async () => {}, presentPaymentSheet: async () => {} });
+
+if (Platform.OS !== 'web') {
+  try {
+    const stripe = require('@stripe/stripe-react-native');
+    useStripe = stripe.useStripe;
+  } catch (error) {
+    console.warn('Stripe not available on this platform');
+  }
+}
 
 interface PlanInfo {
   id: string
@@ -38,6 +50,10 @@ export default function SettingsScreen() {
   const { user, profile, signOut } = useAuth()
   const userRole = useRole()
   const { initPaymentSheet, presentPaymentSheet } = useStripe()
+  const { themeMode, setThemeMode, isDark } = useTheme()
+  const colors = useColors()
+  const spacing = useSpacing()
+  const radius = useRadius()
   const [loading, setLoading] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
 
@@ -170,7 +186,7 @@ export default function SettingsScreen() {
         },
         appearance: {
           colors: {
-            primary: Colors?.primary?.DEFAULT ?? '#52525B',
+            primary: colors.primary.DEFAULT,
           },
         },
       })
@@ -310,7 +326,7 @@ export default function SettingsScreen() {
       <View style={styles.features}>
         {plan.features.map((feature, index) => (
           <View key={index} style={styles.featureItem}>
-            <StyledText variant="body" color="success" style={styles.checkmark}>
+            <StyledText variant="body" color="primary" style={styles.checkmark}>
               ✓
             </StyledText>
             <StyledText variant="body" style={styles.featureText}>
@@ -363,6 +379,48 @@ export default function SettingsScreen() {
     </TouchableOpacity>
   )
 
+  const renderThemeSelector = () => {
+    const themeOptions = [
+      { key: 'light', label: 'ライト' },
+      { key: 'dark', label: 'ダーク' },
+      { key: 'system', label: '端末に合わせる' },
+    ]
+
+    return (
+      <Card variant="elevated" style={styles.settingsCard}>
+        <StyledText variant="subtitle" weight="semibold" style={styles.sectionTitle}>
+          テーマ
+        </StyledText>
+        <View style={styles.themeSelector}>
+          {themeOptions.map((option) => (
+            <TouchableOpacity
+              key={option.key}
+              style={[
+                styles.themeOption,
+                themeMode === option.key && styles.themeOptionSelected
+              ]}
+              onPress={() => setThemeMode(option.key as ThemeMode)}
+              activeOpacity={0.7}
+            >
+              <StyledText 
+                variant="body" 
+                weight="medium"
+                color={themeMode === option.key ? 'onPrimary' : 'primary'}
+              >
+                {option.label}
+              </StyledText>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <StyledText variant="caption" color="secondary" style={styles.themeDescription}>
+          テーマは即座に適用されます。「端末に合わせる」を選択すると、デバイスの設定に従います。
+        </StyledText>
+      </Card>
+    )
+  }
+
+  const styles = createStyles(colors, spacing, radius)
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -383,6 +441,9 @@ export default function SettingsScreen() {
         {/* 現在のプラン */}
         {renderCurrentPlan()}
 
+        {/* テーマ選択 */}
+        {renderThemeSelector()}
+
         {/* 設定項目 */}
         <Card variant="elevated" style={styles.settingsCard}>
           <StyledText variant="subtitle" weight="semibold" style={styles.sectionTitle}>
@@ -394,7 +455,7 @@ export default function SettingsScreen() {
         {/* ログアウトボタン */}
         <StyledButton
           title={loading ? "ログアウト中..." : "ログアウト"}
-          variant="danger"
+          variant="outline"
           onPress={handleSignOut}
           loading={loading}
           style={styles.signOutButton}
@@ -410,28 +471,31 @@ export default function SettingsScreen() {
           </StyledText>
         </View>
       </ScrollView>
+      
+      {/* 統一グローバルFAB */}
+      <GlobalFABMenu currentRoute="/(tabs)/settings" />
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, spacing: any, radius: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors?.base?.background ?? '#F3F4F6',
+    backgroundColor: colors.background.primary,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: Spacing?.md,
-    paddingBottom: Spacing['2xl'],
+    padding: spacing[4],
+    paddingBottom: spacing[8],
   },
   header: {
-    marginBottom: Spacing?.lg,
-    paddingTop: Spacing?.sm,
+    marginBottom: spacing[6],
+    paddingTop: spacing[2],
   },
   userCard: {
-    marginBottom: Spacing?.lg,
+    marginBottom: spacing[6],
   },
   userInfo: {
     flexDirection: 'row',
@@ -440,31 +504,31 @@ const styles = StyleSheet.create({
   avatar: {
     width: 60,
     height: 60,
-    backgroundColor: Colors?.primary?.DEFAULT ?? '#52525B',
+    backgroundColor: colors.primary.DEFAULT,
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing?.md,
+    marginRight: spacing[4],
   },
   userDetails: {
     flex: 1,
   },
   roleBadge: {
-    backgroundColor: Colors?.primary?.DEFAULT ?? '#52525B',
-    paddingHorizontal: Spacing?.sm,
-    paddingVertical: Spacing?.xs,
-    borderRadius: BorderRadius?.md,
+    backgroundColor: colors.primary.DEFAULT,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: radius.md,
     alignSelf: 'flex-start',
-    marginTop: Spacing?.xs,
+    marginTop: spacing[1],
   },
   planCard: {
-    marginBottom: Spacing?.lg,
+    marginBottom: spacing[6],
   },
   section: {
-    marginBottom: Spacing?.lg,
+    marginBottom: spacing[6],
   },
   sectionTitle: {
-    marginBottom: Spacing?.md,
+    marginBottom: spacing[4],
   },
   currentPlanInfo: {
     flexDirection: 'row',
@@ -472,78 +536,100 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   planOption: {
-    marginBottom: Spacing?.md,
+    marginBottom: spacing[4],
     position: 'relative',
   },
   currentPlanOption: {
     borderWidth: 2,
-    borderColor: Colors?.primary?.DEFAULT ?? '#52525B',
+    borderColor: colors.primary.DEFAULT,
   },
   popularPlan: {
     borderWidth: 2,
-    borderColor: Colors?.semantic?.warning ?? '#D97706',
+    borderColor: '#D97706',
   },
   popularBadge: {
     position: 'absolute',
     top: -8,
-    right: Spacing?.md,
-    backgroundColor: Colors?.semantic?.warning ?? '#D97706',
-    paddingHorizontal: Spacing?.sm,
-    paddingVertical: Spacing?.xs,
-    borderRadius: BorderRadius?.md,
+    right: spacing[4],
+    backgroundColor: '#D97706',
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: radius.md,
     zIndex: 1,
   },
   planHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing?.md,
+    marginBottom: spacing[4],
   },
   features: {
-    marginBottom: Spacing?.md,
+    marginBottom: spacing[4],
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing?.xs,
+    marginBottom: spacing[1],
   },
   checkmark: {
-    marginRight: Spacing?.sm,
-    fontSize: Typography?.base,
+    marginRight: spacing[2],
+    fontSize: 16,
   },
   featureText: {
     flex: 1,
   },
   upgradeButton: {
-    marginTop: Spacing?.sm,
+    marginTop: spacing[2],
   },
   currentBadge: {
-    backgroundColor: 'rgba(82, 82, 91, 0.1)',
-    padding: Spacing?.sm,
-    borderRadius: BorderRadius?.md,
+    backgroundColor: `${colors.primary.DEFAULT}20`,
+    padding: spacing[2],
+    borderRadius: radius.md,
     alignItems: 'center',
-    marginTop: Spacing?.sm,
+    marginTop: spacing[2],
   },
   settingsCard: {
-    marginBottom: Spacing?.lg,
+    marginBottom: spacing[6],
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing?.md,
+    paddingVertical: spacing[4],
     borderBottomWidth: 1,
-    borderBottomColor: Colors?.border?.light ?? '#E5E7EB',
+    borderBottomColor: colors.border,
   },
   settingContent: {
     flex: 1,
   },
   signOutButton: {
-    marginBottom: Spacing?.lg,
+    marginBottom: spacing[6],
   },
   footer: {
     alignItems: 'center',
-    paddingTop: Spacing?.lg,
-    gap: Spacing?.xs,
+    paddingTop: spacing[6],
+    gap: spacing[1],
+  },
+  themeSelector: {
+    flexDirection: 'row',
+    marginBottom: spacing[4],
+    backgroundColor: colors.background.secondary,
+    borderRadius: radius.DEFAULT,
+    padding: 2,
+  },
+  themeOption: {
+    flex: 1,
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[4],
+    borderRadius: radius.DEFAULT - 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeOptionSelected: {
+    backgroundColor: colors.primary.DEFAULT,
+  },
+  themeDescription: {
+    marginTop: spacing[1],
+    lineHeight: 18,
   },
 })
