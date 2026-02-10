@@ -4,3 +4,13 @@
 
 expo-env.d.ts
 # @end expo-cli
+.expo/
+
+# 古いテンプレート/サンプルコード（ハードコードされた秘密情報を含む）
+app-example/
+
+# Expo / Metro / local
+.expo/
+**/.expo/
+.expo-shared/
+.expo-*
