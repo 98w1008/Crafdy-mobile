@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import { supabase, supabaseReady } from '@/lib/supabase'
+import { loadDemoFlag } from '@/lib/api'
+import { setAccessToken as setStoredAccessToken } from '@/lib/token-store'
 
 type UserRole = 'parent' | 'lead' | 'worker'
 
@@ -20,6 +22,7 @@ interface ProjectAccess {
   project_id: string
   project_name: string
   role: 'parent' | 'lead'
+  prefecture?: string // Added for UI display
   started_at?: string
   ended_at?: string
 }
@@ -27,6 +30,8 @@ interface ProjectAccess {
 interface AuthContextType {
   user: User | null
   session: Session | null
+  accessToken: string | null
+  accessTokenRef: React.MutableRefObject<string | null>
   profile: UserProfile | null
   projectAccess: ProjectAccess[]
   loading: boolean
@@ -47,17 +52,24 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [projectAccess, setProjectAccess] = useState<ProjectAccess[]>([])
   const [loading, setLoading] = useState(true)
 
+  // 重複実行防止用のRef
+  const isFetchingAccessRef = React.useRef(false)
+  // 同期的なアクセストークン参照用（レンダー遅延対策）
+  const accessTokenRef = React.useRef<string | null>(null)
+
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    if (!supabase) return null
     try {
       const { data, error } = await supabase
-        .from('profiles')              // users ではなく profiles を参照
+        .from('user_profiles')         // profiles (view) ではなく user_profiles (table) を参照
         .select('*')
         .eq('user_id', userId)
-        .maybeSingle()                 // 0件でもエラーにしない
+        .maybeSingle()
 
       if (error) {
         console.warn('⚠️ fetchUserProfile failed:', error)
@@ -68,14 +80,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const userProfile: UserProfile = {
         id: data.user_id,
-        full_name: (data as any).full_name ?? null,
+        full_name: data.full_name ?? null,
         email: data.email || user?.email || '',
-        role: (data as any).role || 'parent',
-        company: (data as any).company ?? null,
-        daily_rate: (data as any).daily_rate,
-        is_active: (data as any).is_active !== false,
-        created_at: (data as any).created_at || new Date().toISOString(),
-        updated_at: (data as any).updated_at || new Date().toISOString(),
+        role: (data.role as UserRole) || 'parent',
+        company: data.company ?? null,
+        daily_rate: data.daily_rate,
+        is_active: data.is_active !== false,
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString(),
       }
       return userProfile
     } catch (error) {
@@ -93,74 +105,124 @@ export function AuthProvider({ children }: AuthProviderProps) {
       .maybeSingle()
 
     if (!data) {
-      await supabase.from('user_profiles').insert({ 
-        user_id: userId, 
-        display_name: (email||'').split('@')[0], 
+      await supabase.from('user_profiles').insert({
+        user_id: userId,
+        display_name: (email || '').split('@')[0],
         role: 'worker'
       })
     }
   }
 
-  const fetchProjectAccess = async (userId: string): Promise<ProjectAccess[]> => {
-    try {
-      console.log('🔍 Fetching project access for:', userId)
-      
-      const { data, error } = await supabase
-        .from('project_members')
-        .select(`
-          project_id,
-          user_id,
-          role,
-          projects!inner(name)
-        `)
-        .eq('user_id', userId)
+  // 内部取得処理（State更新なし、純粋なデータ取得のみ）
+  const _fetchProjectAccessData = async (userId: string): Promise<ProjectAccess[]> => {
+    if (!supabase) return []
 
-      if (error) {
-        console.warn('⚠️ fetchProjectAccess failed:', error)
+    // 10秒タイムアウト設定
+    const timeoutMs = 10000
+    let timeoutId: any = null
+
+    const fetchPromise = (async () => {
+      try {
+        console.log('🔍 Fetching project access data for:', userId)
+
+        const { data, error } = await supabase
+          .from('project_members')
+          .select(`
+            project_id,
+            user_id,
+            role,
+            projects!inner(name, prefecture)
+          `)
+          .eq('user_id', userId)
+
+        if (error) {
+          console.warn('⚠️ _fetchProjectAccessData failed:', error)
+          return []
+        }
+
+        const accessList: ProjectAccess[] = data?.map(access => {
+          const projectData = Array.isArray(access.projects) ? access.projects[0] : access.projects
+          return {
+            project_id: access.project_id,
+            project_name: (projectData as any)?.name || '不明な現場',
+            role: access.role as 'parent' | 'lead',
+            prefecture: (projectData as any)?.prefecture || '',
+            started_at: new Date().toISOString(),
+            ended_at: undefined
+          }
+        }) || []
+
+        return accessList
+
+      } catch (error) {
+        console.warn('⚠️ Error in _fetchProjectAccessData:', error)
         return []
       }
+    })()
 
-      const accessList: ProjectAccess[] = data?.map(access => ({
-        project_id: access.project_id,
-        project_name: access.projects.name,
-        role: access.role as 'parent' | 'lead',
-        started_at: new Date().toISOString(), // デフォルト値
-        ended_at: undefined
-      })) || []
-      
-      console.log('✅ Project access fetched:', accessList.length, 'projects')
-      return accessList
-      
-    } catch (error) {
-      console.warn('⚠️ Error in fetchProjectAccess:', error)
+    const timeoutPromise = new Promise<ProjectAccess[]>((resolve) => {
+      timeoutId = setTimeout(() => {
+        console.warn(`⚠️ _fetchProjectAccessData TIMEOUT after ${timeoutMs}ms`)
+        resolve([])
+      }, timeoutMs)
+    })
+
+    try {
+      const result = await Promise.race([fetchPromise, timeoutPromise])
+      if (timeoutId) clearTimeout(timeoutId)
+      return result
+    } catch (e) {
+      if (timeoutId) clearTimeout(timeoutId)
       return []
     }
   }
 
+  // 公開用：State更新を含むリフレッシュ処理（排他制御あり）
+  const refreshProjectAccess = async () => {
+    if (!user) return
+    if (isFetchingAccessRef.current) {
+      console.log('⏳ refreshProjectAccess skipped (already in flight)')
+      return
+    }
+
+    try {
+      isFetchingAccessRef.current = true
+      console.log('🔄 refreshProjectAccess start...')
+      const access = await _fetchProjectAccessData(user.id)
+
+      setProjectAccess(prev => {
+        console.log(`✅ Project access updated: ${prev.length} -> ${access.length} projects`)
+        return access
+      })
+    } catch (e) {
+      console.error('❌ refreshProjectAccess error:', e)
+    } finally {
+      isFetchingAccessRef.current = false
+    }
+  }
+
+  // 旧メソッド互換性維持（ただし内部でリフレッシュを呼ぶ形にはしない、データだけ返す）
+  // ※ setupSession等で使われているため残すが、基本は refreshProjectAccess 推奨
+  const fetchProjectAccess = async (userId: string): Promise<ProjectAccess[]> => {
+    return _fetchProjectAccessData(userId)
+  }
+
   const refreshProfile = async () => {
     if (!user) return
-    
     console.log('🔄 Refreshing profile...')
     const userProfile = await fetchUserProfile(user.id)
     setProfile(userProfile)
   }
-
-  const refreshProjectAccess = async () => {
-    if (!user) return
-    
-    console.log('🔄 Refreshing project access...')
-    const access = await fetchProjectAccess(user.id)
-    setProjectAccess(access)
-  }
+  // refreshProjectAccess is now defined above with mutex
 
   const hasProjectAccess = (projectId: string): boolean => {
     if (!profile) return false
-    
+
     // 親アカウントは自分が作成したプロジェクトにアクセス可能
     if (profile.role === 'parent') {
       return true // 親は基本的に全プロジェクトアクセス可能（RLSで制御）
     }
-    
+
     // 職長は割り当てられたプロジェクトのみアクセス可能
     return projectAccess.some(access => access.project_id === projectId)
   }
@@ -173,44 +235,102 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return profile?.role === 'lead'
   }
 
+  // Phase 1 Option C: token-store 同期ヘルパー
+  // getSession() を呼んだ直後に必ず呼び出し、token-store を最新状態に保つ
+  const syncSessionToTokenStore = (session: Session | null | undefined) => {
+    const token = session?.access_token ?? null
+    setStoredAccessToken(token)
+    if (token) {
+      accessTokenRef.current = token
+      setAccessToken(token)
+    }
+  }
+
+  useEffect(() => {
+    loadDemoFlag()
+      .then(async flag => {
+        if (!flag || !supabase || !supabaseReady) return
+        const { data } = await supabase.auth.getSession()
+        // Phase 1 Option C: token-store 同期
+        syncSessionToTokenStore(data?.session)
+        if (!data?.session) {
+          try {
+            await supabase.auth.signInAnonymously()
+          } catch (error) {
+            console.warn('⚠️ Anonymous sign-in failed', error)
+          }
+        }
+      })
+      .catch(error => console.warn('⚠️ demo flag check failed', error))
+  }, [])
+
   useEffect(() => {
     let mounted = true
 
     // Supabase未準備なら監視をスキップ
     if (!supabase || !supabaseReady) {
       setLoading(false)
-      return () => {}
+      return () => { }
+    }
+
+    // セッション設定とデータ取得の共通処理
+    const setupSession = async (currentSession: Session) => {
+      setSession(currentSession)
+      setAccessToken(currentSession.access_token)
+      setStoredAccessToken(currentSession.access_token)
+      accessTokenRef.current = currentSession.access_token
+      setUser(currentSession.user)
+
+      try {
+        await ensureProfile(currentSession.user.id, currentSession.user.email)
+
+        // プロフィール取得
+        const userProfile = await fetchUserProfile(currentSession.user.id)
+        if (mounted) setProfile(userProfile)
+
+        // プロジェクト権限取得（refreshProjectAccessのロジックを再利用したいが、
+        // user stateがまだ更新反映されていない可能性があるため、直接内部関数を呼んでセットする）
+        if (!isFetchingAccessRef.current) {
+          isFetchingAccessRef.current = true
+          const access = await _fetchProjectAccessData(currentSession.user.id)
+          if (mounted) {
+            setProjectAccess(access)
+            console.log('✅ Initial project access set:', access.length)
+          }
+          isFetchingAccessRef.current = false
+        }
+
+      } catch (e) {
+        console.warn('⚠️ Error setting up session data:', e)
+        isFetchingAccessRef.current = false
+      }
     }
 
     // 認証状態の変更を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         console.log('🔐 Auth state changed:', event)
-        
+
         if (!mounted) return
 
-        if (event === 'SIGNED_IN' && currentSession) {
-          setSession(currentSession)
-          setUser(currentSession.user)
-          
-          // プロファイル確保とプロジェクトアクセスを取得
-          await ensureProfile(currentSession.user.id, currentSession.user.email)
-          const [userProfile, access] = await Promise.all([
-            fetchUserProfile(currentSession.user.id),
-            fetchProjectAccess(currentSession.user.id)
-          ])
-          
-          if (mounted) {
-            setProfile(userProfile)
-            setProjectAccess(access)
-          }
+        // セッションが提供されるイベントはすべてハンドリングする
+        if (currentSession && (
+          event === 'SIGNED_IN' ||
+          event === 'TOKEN_REFRESHED' ||
+          event === 'USER_UPDATED' ||
+          event === 'INITIAL_SESSION'
+        )) {
+          await setupSession(currentSession)
         } else if (event === 'SIGNED_OUT') {
           setSession(null)
+          setAccessToken(null)
+          setStoredAccessToken(null)
+          accessTokenRef.current = null
           setUser(null)
           setProfile(null)
           setProjectAccess([])
         }
-        
+
         if (mounted) {
           setLoading(false)
         }
@@ -220,8 +340,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // 初期セッション確認
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
+        const { data: { session }, error } = await supabase!.auth.getSession()
+
+        // Phase 1 Option C: token-store 同期
+        syncSessionToTokenStore(session)
+
         if (error) {
           console.warn('⚠️ Error getting session:', error)
           if (mounted) setLoading(false)
@@ -229,23 +352,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (session && mounted) {
-          console.log('🔐 Initial session found')
-          setSession(session)
-          setUser(session.user)
-          
-          // プロファイル確保とプロジェクトアクセスを取得
-          await ensureProfile(session.user.id, session.user.email)
-          const [userProfile, access] = await Promise.all([
-            fetchUserProfile(session.user.id),
-            fetchProjectAccess(session.user.id)
-          ])
-          
-          if (mounted) {
-            setProfile(userProfile)
-            setProjectAccess(access)
+          console.log('🔐 Initial session found:', session.user.id)
+          await setupSession(session)
+        } else {
+          console.log('🔐 No initial session found, attempting anonymous sign-in...')
+          try {
+            const { data: anonData, error: anonError } = await supabase!.auth.signInAnonymously()
+            if (anonError) {
+              console.error('⚠️ Anonymous sign-in failed:', anonError)
+            } else if (anonData.session && mounted) {
+              console.log('✅ Anonymous sign-in successful:', anonData.session.user.id)
+              // onAuthStateChange(SIGNED_IN) が発火するはずだが、念のためここでもセットアップ
+              await setupSession(anonData.session)
+            }
+          } catch (e) {
+            console.error('⚠️ Anonymous sign-in exception:', e)
           }
         }
-        
+
         if (mounted) {
           setLoading(false)
         }
@@ -267,24 +391,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('🔐 Signing out...')
       setLoading(true)
-      
+
       if (!supabase) {
         console.warn('⚠️ Supabase not initialized')
         return
       }
-      
+
       const { error } = await supabase.auth.signOut()
       if (error) {
         console.warn('⚠️ Error signing out:', error)
         throw error
       }
-      
+
       // 状態をクリア
       setUser(null)
       setSession(null)
+      setAccessToken(null)
+      setStoredAccessToken(null)
+      accessTokenRef.current = null
       setProfile(null)
       setProjectAccess([])
-      
+
       console.log('✅ Successfully signed out')
     } catch (error) {
       console.warn('⚠️ Error during sign out:', error)
@@ -297,6 +424,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value: AuthContextType = {
     user,
     session,
+    accessToken,
+    accessTokenRef,
     profile,
     projectAccess,
     loading,
@@ -322,12 +451,14 @@ export function useAuth() {
     return {
       user: null,
       session: null,
+      accessToken: null,
+      accessTokenRef: { current: null } as React.MutableRefObject<string | null>,
       profile: null,
       projectAccess: [],
       loading: true,
-      signOut: async () => {},
-      refreshProfile: async () => {},
-      refreshProjectAccess: async () => {},
+      signOut: async () => { },
+      refreshProfile: async () => { },
+      refreshProjectAccess: async () => { },
       hasProjectAccess: () => false,
       isParent: () => false,
       isLead: () => false,

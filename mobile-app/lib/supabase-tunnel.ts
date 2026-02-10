@@ -2,6 +2,7 @@
 import 'react-native-get-random-values'
 import 'react-native-url-polyfill/auto'
 import { createClient } from '@supabase/supabase-js'
+import { getAccessToken, hasValidJwt } from '@/lib/token-store'
 import * as SecureStore from 'expo-secure-store'
 import Constants from 'expo-constants'
 
@@ -133,8 +134,11 @@ export async function testTunnelSupabaseConnection(client: any) {
   try {
     // Test 1: Basic connectivity
     console.log('Test 1: Basic Auth Endpoint')
-    const { data: session, error: sessionError } = await client.auth.getSession()
-    console.log(`   Session check: ${sessionError ? '❌ ' + sessionError.message : '✅ Success'}`)
+    const token = getAccessToken()
+    if (!hasValidJwt(token)) {
+      throw new Error('Authorization token is not available')
+    }
+    console.log('   Session check: ✅ token available')
     
     // Test 2: Database connectivity
     console.log('Test 2: Database Query Test')

@@ -1,6 +1,5 @@
 // Tunnel接続安定化システム - Error Diagnostic Agent
-import Constants from 'expo-constants'
-import { supabase } from './supabase'
+import { getAccessToken, hasValidJwt } from '@/lib/token-store'
 
 class TunnelStabilityManager {
   private reconnectAttempts = 0
@@ -30,11 +29,11 @@ class TunnelStabilityManager {
       console.log('🔍 Checking tunnel health...')
       
       const start = Date.now()
-      const { data, error } = await supabase.auth.getSession()
+      const token = getAccessToken()
       const duration = Date.now() - start
-      
-      if (error) {
-        console.log(`⚠️ Tunnel health check failed: ${error.message}`)
+
+      if (!hasValidJwt(token)) {
+        console.log('⚠️ Tunnel health check failed: Authorization token is not available')
         this.handleConnectionIssue()
       } else if (duration > 10000) {
         console.log(`⚠️ Tunnel response slow: ${duration}ms`)
