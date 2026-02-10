@@ -36,20 +36,27 @@ export class NetworkDiagnostic {
     }
     
     // Test 4: Specific Supabase project test
-    const supabaseUrl = 'https://aerscsgzulqfsecltyjz.supabase.co'
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+
     console.log('\nTest 4: Project-specific Supabase test')
-    try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-        method: 'HEAD',
-        headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlcnNjc2d6dWxxZnNlY2x0eWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1MDk1NjQsImV4cCI6MjA2NjA4NTU2NH0.uNl3O7WzSQm-ud2OIjs7SV6jrqVdDSmeG6cvFoKA94I',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlcnNjc2d6dWxxZnNlY2x0eWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1MDk1NjQsImV4cCI6MjA2NjA4NTU2NH0.uNl3O7WzSQm-ud2OIjs7SV6jrqVdDSmeG6cvFoKA94I'
-        },
-        timeout: 5000
-      })
-      console.log('  Project REST API status:', response.status)
-    } catch (error) {
-      console.log('  Project REST API error:', error.message)
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.log('  ⚠️ Skipped: SUPABASE_URL or SUPABASE_ANON_KEY not set')
+    } else {
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+          method: 'HEAD',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${supabaseAnonKey}`
+          },
+          timeout: 5000
+        })
+        console.log('  Project REST API status:', response.status)
+      } catch (error) {
+        console.log('  Project REST API error:', error.message)
+      }
     }
     
     // Test 5: Environment variables test
