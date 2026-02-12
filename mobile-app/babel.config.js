@@ -6,12 +6,12 @@ module.exports = function (api) {
       [
         'module-resolver',
         {
-          root: ['./'],
-          alias: {
-            '@': './',
-          },
+          alias: { '@': ['./src', '.'] },
+          extensions: ['.tsx', '.ts', '.js', '.json'],
         },
       ],
+      // Reanimated v3 uses worklets plugin; must be last
+      'react-native-worklets/plugin',
     ],
   };
 };

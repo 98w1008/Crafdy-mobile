@@ -1,0 +1,10 @@
+# Supabase platform configuration overrides
+# Apply with `supabase start` or upload via Dashboard > Configuration > Auth
+
+[auth.rate_limit]
+email_sent = 2
+sms_sent = 30
+anonymous_users = 30
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30

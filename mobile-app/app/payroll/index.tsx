@@ -6,14 +6,15 @@ import {
   Alert,
   Linking,
   ViewStyle,
+  Modal,
 } from 'react-native'
 import { router } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
-import { StyledText, StyledButton } from '@/components/ui'
+import { StyledText, StyledButton, Icon } from '@/components/ui'
 import Card from '../../components/ui/Card'
 import PayrollSettingsModal from '../../components/PayrollSettingsModal'
 import { useAuth } from '@/contexts/AuthContext'
-import { useColors, useSpacing } from '@/theme/ThemeProvider'
+import { useColors, useSpacing, useRadius } from '@/theme/ThemeProvider'
 import {
   getPayrollSettings,
   savePayrollSettings,
@@ -35,6 +36,7 @@ interface PayrollScreenState {
   settings?: PayrollSettings
   isSettingsLoading: boolean
   showSettingsModal: boolean
+  showFirstTimeModal: boolean
   currentPeriod?: PayrollPeriod
   availablePeriods: PayrollPeriod[]
   selectedPeriodIndex: number
@@ -52,11 +54,13 @@ export default function PayrollScreen() {
   const { user, userProfile } = useAuth()
   const colors = useColors()
   const spacing = useSpacing()
+  const radius = useRadius()
 
   // 状態管理
   const [state, setState] = useState<PayrollScreenState>({
     isSettingsLoading: false,
     showSettingsModal: false,
+    showFirstTimeModal: false,
     availablePeriods: [],
     selectedPeriodIndex: 0,
     summaries: [],
@@ -432,7 +436,7 @@ export default function PayrollScreen() {
           </Card>
         ) : state.summaries.length > 0 ? (
           <View style={sectionStyle}>
-            {state.summaries.map((summary, index) => (
+            {state.summaries.map((summary) => (
               <Card key={summary.user_id} padding="lg" style={cardStyle}>
                 <StyledText variant="subtitle" weight="semibold" style={{ marginBottom: spacing[3] }}>
                   {summary.user_name}

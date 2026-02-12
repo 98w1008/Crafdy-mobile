@@ -103,11 +103,11 @@ type EstimateStep = 'client_selection' | 'scope_definition' | 'unified_upload' |
 export default function SmartEstimateScreen() {
   const params = useLocalSearchParams()
   const clientId = params.client_id as string
-  
+
   const { user } = useAuth()
   const colors = useColors()
   const spacing = useSpacing()
-  
+
   // State
   const [currentStep, setCurrentStep] = useState<EstimateStep>('client_selection')
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
@@ -122,9 +122,10 @@ export default function SmartEstimateScreen() {
     estimated_duration: 30
   })
   const [smartEstimate, setSmartEstimate] = useState<SmartEstimate | null>(null)
+  const [prospectId, setProspectId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [progress, setProgress] = useState(0)
-  
+
   // Mock clients data
   const [clients] = useState<Client[]>([
     {
@@ -190,31 +191,31 @@ export default function SmartEstimateScreen() {
   // AI分析実行
   const runAIAnalysis = async () => {
     if (!selectedClient) return
-    
+
     setIsLoading(true)
     setCurrentStep('ai_analysis')
     setProgress(0)
-    
+
     try {
       // Step 1: 市場データ分析
       setProgress(0.2)
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       // Step 2: クライアント特性分析
       setProgress(0.4)
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       // Step 3: 価格最適化
       setProgress(0.6)
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       // Step 4: リスク分析
       setProgress(0.8)
       await new Promise(resolve => setTimeout(resolve, 800))
-      
+
       // Step 5: 見積生成
       setProgress(1.0)
-      
+
       // AI生成結果（模擬）
       const mockEstimate: SmartEstimate = {
         client: selectedClient,
@@ -332,12 +333,12 @@ export default function SmartEstimateScreen() {
           ]
         }
       }
-      
+
       setSmartEstimate(mockEstimate)
       setCurrentStep('review')
-      
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      
+
     } catch (error) {
       console.error('AI分析エラー:', error)
       Alert.alert('エラー', 'AI分析に失敗しました')
@@ -363,7 +364,7 @@ export default function SmartEstimateScreen() {
         <StyledText variant="subtitle" weight="semibold" style={styles.sectionTitle}>
           顧客を選択してください
         </StyledText>
-        
+
         {clients.map((client) => (
           <TouchableOpacity
             key={client.id}
@@ -375,8 +376,8 @@ export default function SmartEstimateScreen() {
                 <StyledText variant="body" weight="semibold">
                   {client.name}
                 </StyledText>
-                <Chip 
-                  mode="outlined" 
+                <Chip
+                  mode="outlined"
                   compact
                   style={[styles.typeChip, {
                     backgroundColor: getClientTypeColor(client.type)
@@ -385,7 +386,7 @@ export default function SmartEstimateScreen() {
                   {getClientTypeLabel(client.type)}
                 </Chip>
               </View>
-              
+
               <View style={styles.clientDetails}>
                 <View style={styles.clientMetric}>
                   <StyledText variant="caption" color="secondary">予算帯</StyledText>
@@ -402,8 +403,8 @@ export default function SmartEstimateScreen() {
                 <View style={styles.clientMetric}>
                   <StyledText variant="caption" color="secondary">特性</StyledText>
                   <StyledText variant="caption" weight="medium">
-                    {client.quality_priority > 0.7 ? '品質重視' : 
-                     client.price_sensitivity > 0.7 ? '価格重視' : 'バランス'}
+                    {client.quality_priority > 0.7 ? '品質重視' :
+                      client.price_sensitivity > 0.7 ? '価格重視' : 'バランス'}
                   </StyledText>
                 </View>
               </View>
@@ -411,6 +412,21 @@ export default function SmartEstimateScreen() {
             <IconButton icon="chevron-right" size={20} />
           </TouchableOpacity>
         ))}
+
+
+        <View style={{ height: Spacing.md }} />
+
+        <StyledButton
+          title="現場未設定（仮案件）で進む"
+          variant="outline"
+          onPress={() => {
+            // 仮の顧客データを作成するか、既存の顧客を選択させるか
+            // ここでは「現場未設定」として進むための仮IDを発行
+            setProspectId(`prospect_${Date.now()}`)
+            setCurrentStep('scope_definition')
+          }}
+          style={{ marginTop: Spacing.sm }}
+        />
       </Card>
     </View>
   )
@@ -443,7 +459,7 @@ export default function SmartEstimateScreen() {
                   styles.optionButton,
                   projectScope.type === option.key && styles.optionSelected
                 ]}
-                onPress={() => setProjectScope({...projectScope, type: option.key as any})}
+                onPress={() => setProjectScope({ ...projectScope, type: option.key as any })}
               >
                 <StyledText variant="caption" weight="medium">
                   {option.label}
@@ -470,7 +486,7 @@ export default function SmartEstimateScreen() {
                   styles.optionButton,
                   projectScope.size_category === option.key && styles.optionSelected
                 ]}
-                onPress={() => setProjectScope({...projectScope, size_category: option.key as any})}
+                onPress={() => setProjectScope({ ...projectScope, size_category: option.key as any })}
               >
                 <StyledText variant="caption" weight="medium">
                   {option.label}
@@ -497,7 +513,7 @@ export default function SmartEstimateScreen() {
                   styles.optionButton,
                   projectScope.complexity === option.key && styles.optionSelected
                 ]}
-                onPress={() => setProjectScope({...projectScope, complexity: option.key as any})}
+                onPress={() => setProjectScope({ ...projectScope, complexity: option.key as any })}
               >
                 <StyledText variant="caption" weight="medium">
                   {option.label}
@@ -515,7 +531,7 @@ export default function SmartEstimateScreen() {
             mode="outlined"
             value={projectScope.estimated_duration.toString()}
             onChangeText={(text) => setProjectScope({
-              ...projectScope, 
+              ...projectScope,
               estimated_duration: parseInt(text) || 30
             })}
             keyboardType="numeric"
@@ -614,7 +630,7 @@ export default function SmartEstimateScreen() {
           <StyledText variant="body" color="secondary" align="center" style={styles.analysisText}>
             市場データ、顧客特性、過去実績を総合的に分析しています
           </StyledText>
-          
+
           <View style={styles.analysisSteps}>
             {projectScope.uploadedFiles && projectScope.uploadedFiles.length > 0 && (
               <View style={[styles.analysisStep, { opacity: progress >= 0.15 ? 1 : 0.5 }]}>
@@ -634,7 +650,7 @@ export default function SmartEstimateScreen() {
               <StyledText variant="body" weight="medium">⚠️ リスク分析</StyledText>
             </View>
           </View>
-          
+
           <View style={styles.progressContainer}>
             <ProgressBar progress={progress} color={colors.primary.DEFAULT} />
             <StyledText variant="caption" align="center" style={{ marginTop: spacing[2] }}>
@@ -665,15 +681,15 @@ export default function SmartEstimateScreen() {
               (税込・利益率 {(smartEstimate.summary.profit_margin * 100).toFixed(0)}%)
             </StyledText>
           </View>
-          
+
           <View style={styles.winProbability}>
             <StyledText variant="body" weight="medium" style={{ marginBottom: spacing[2] }}>
               🎯 受注確率: {(smartEstimate.ai_insights.win_probability * 100).toFixed(0)}%
             </StyledText>
-            <ProgressBar 
-              progress={smartEstimate.ai_insights.win_probability} 
-              color={smartEstimate.ai_insights.win_probability > 0.7 ? Colors.success : 
-                     smartEstimate.ai_insights.win_probability > 0.4 ? Colors.warning : Colors.error}
+            <ProgressBar
+              progress={smartEstimate.ai_insights.win_probability}
+              color={smartEstimate.ai_insights.win_probability > 0.7 ? Colors.success :
+                smartEstimate.ai_insights.win_probability > 0.4 ? Colors.warning : Colors.error}
             />
           </View>
         </Card>
@@ -683,15 +699,15 @@ export default function SmartEstimateScreen() {
           <StyledText variant="subtitle" weight="semibold" style={styles.sectionTitle}>
             📋 見積内訳
           </StyledText>
-          
+
           {smartEstimate.items.map((item, index) => (
             <View key={item.id} style={styles.estimateItem}>
               <View style={styles.itemHeader}>
                 <StyledText variant="body" weight="medium">
                   {item.name}
                 </StyledText>
-                <Chip 
-                  mode="outlined" 
+                <Chip
+                  mode="outlined"
                   compact
                   style={[styles.categoryChip, {
                     backgroundColor: getCategoryColor(item.category)
@@ -726,13 +742,13 @@ export default function SmartEstimateScreen() {
           <StyledText variant="subtitle" weight="semibold" style={styles.sectionTitle}>
             🤖 AI の分析結果
           </StyledText>
-          
+
           <View style={styles.insightSection}>
             <StyledText variant="body" weight="medium" color="primary">
               💡 最適価格帯
             </StyledText>
             <StyledText variant="body" style={{ marginLeft: spacing[3] }}>
-              ¥{smartEstimate.ai_insights.optimal_price_range.min.toLocaleString()} - 
+              ¥{smartEstimate.ai_insights.optimal_price_range.min.toLocaleString()} -
               ¥{smartEstimate.ai_insights.optimal_price_range.max.toLocaleString()}
             </StyledText>
           </View>
@@ -776,7 +792,7 @@ export default function SmartEstimateScreen() {
           <StyledText variant="subtitle" weight="semibold" style={styles.sectionTitle}>
             📅 工程予測
           </StyledText>
-          
+
           <View style={styles.scheduleInfo}>
             <View style={styles.scheduleItem}>
               <StyledText variant="caption" color="secondary">着工予定</StyledText>
@@ -814,7 +830,14 @@ export default function SmartEstimateScreen() {
               elevated={true}
               onPress={() => {
                 setCurrentStep('finalize')
-                router.push(`/estimates/create?estimate_data=${JSON.stringify(smartEstimate)}`)
+                const navigationParams = {
+                  estimate_data: JSON.stringify(smartEstimate),
+                  prospect_id: prospectId
+                }
+                router.push({
+                  pathname: '/estimate/new',
+                  params: navigationParams
+                })
               }}
               style={styles.actionButton}
             />
@@ -888,10 +911,10 @@ export default function SmartEstimateScreen() {
           </StyledText>
           <StyledText variant="caption" color="secondary">
             {currentStep === 'client_selection' ? 'クライアント選択' :
-             currentStep === 'scope_definition' ? 'プロジェクト定義' :
-             currentStep === 'unified_upload' ? 'ファイルアップロード' :
-             currentStep === 'ai_analysis' ? 'AI分析中' :
-             currentStep === 'review' ? '結果確認' : '完了'}
+              currentStep === 'scope_definition' ? 'プロジェクト定義' :
+                currentStep === 'unified_upload' ? 'ファイルアップロード' :
+                  currentStep === 'ai_analysis' ? 'AI分析中' :
+                    currentStep === 'review' ? '結果確認' : '完了'}
           </StyledText>
         </View>
         <View style={{ width: 48 }} />

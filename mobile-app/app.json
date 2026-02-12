@@ -1,11 +1,7 @@
 {
   "expo": {
     "name": "CrafdyMobile",
-    "slug": "crafdy-mobile",
-    "owner": "w98",
-    "scheme": "clafdi",
-    "ios": { "bundleIdentifier": "com.clafdy.mobile" },
-    "plugins": ["expo-dev-client", "expo-updates"],
-    "extra": { "eas": { "projectId": "9e5f779b-b71a-41aa-b436-40835077d27c" } }
+    "slug": "crafdymobile",
+    "scheme": "clafdi"
   }
 }

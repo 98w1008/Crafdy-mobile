@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { 
   View, 
   Text, 
@@ -22,6 +22,12 @@ import SystemMessage, { createReportData } from './SystemMessage'
 import { EditableContent } from './EditableContent'
 import { ApprovalActions, StatusBadge } from './ApprovalActions'
 import { SubmissionStatus } from '@/lib/approval-system'
+import { BlocksResponse, MissingField, genEstimate, genInvoice, loadDemoFlag, setDemoFlag } from '@/lib/api'
+import { TEMPLATE_KEYS } from '@/lib/templates'
+import ActionChips from '@/features/chat/ActionChips'
+import ResultCard from '@/ui/blocks/ResultCard'
+import MissingFieldsForm from '@/ui/blocks/MissingFieldsForm'
+import DemoBanner from '@/ui/blocks/DemoBanner'
 // QuickPromptsBar removed (FAB covers actions)
 // import { QuickPromptsBar } from './chat/QuickPrompts'
 import { useColors } from '@/theme/ThemeProvider'
@@ -68,6 +74,12 @@ export default function ChatScreen() {
   const [reportModalVisible, setReportModalVisible] = useState(false)
   const [systemMessages, setSystemMessages] = useState<SystemMessageData[]>([])
   const flatListRef = useRef<FlatList>(null)
+  const [docResponse, setDocResponse] = useState<BlocksResponse | null>(null)
+  const [docError, setDocError] = useState<string | null>(null)
+  const [docLoading, setDocLoading] = useState(false)
+  const [docTarget, setDocTarget] = useState<'invoice' | 'estimate' | null>(null)
+  const [demoEnabled, setDemoEnabled] = useState(false)
+  const lastDocPayloadRef = useRef<Record<string, any>>({})
 
   useEffect(() => {
     if (!projectId || !user) return
@@ -429,6 +441,88 @@ export default function ChatScreen() {
 
   const combinedMessages = createCombinedList()
 
+  const runGenerate = useCallback(async (kind: 'invoice' | 'estimate', payload: Record<string, any>) => {
+    if (!projectId) {
+      Alert.alert('エラー', 'プロジェクトが選択されていません')
+      return
+    }
+
+    const basePayload: Record<string, any> = { projectId, ...payload }
+    if (!basePayload.template_key) {
+      if (kind === 'estimate') {
+        basePayload.template_key = TEMPLATE_KEYS.estimate
+      } else {
+        const invoiceType = typeof basePayload.type === 'string' && basePayload.type.length ? basePayload.type : 'normal'
+        if (!basePayload.type) basePayload.type = invoiceType
+        const templateMap: Record<string, string | undefined> = {
+          normal: TEMPLATE_KEYS.invoiceStandard,
+          progress: TEMPLATE_KEYS.invoiceProgress,
+        }
+        const fallbackTemplate = templateMap.normal || templateMap.progress
+        const resolvedTemplate = templateMap[invoiceType] || fallbackTemplate
+        if (resolvedTemplate) basePayload.template_key = resolvedTemplate
+      }
+    }
+    lastDocPayloadRef.current = basePayload
+    setDocTarget(kind)
+    setDocError(null)
+    setDocLoading(true)
+
+    try {
+      const response = kind === 'invoice' ? await genInvoice(basePayload) : await genEstimate(basePayload)
+      setDocResponse(response)
+      if (response?.meta?.demo) {
+        setDemoEnabled(true)
+      }
+    } catch (err) {
+      console.error('Document generate error:', err)
+      setDocError(err instanceof Error ? err.message : '生成に失敗しました')
+    } finally {
+      setDocLoading(false)
+    }
+  }, [projectId])
+
+  const handleMissingSubmit = useCallback((patch: { period?: { from?: string; to?: string }; mode?: string }) => {
+    if (!docTarget) return
+    const base = lastDocPayloadRef.current || {}
+    const merged: Record<string, any> = { ...base, ...patch }
+    if (patch?.period) {
+      merged.period = { ...(base.period ?? {}), ...patch.period }
+    }
+    if (!merged.projectId && projectId) {
+      merged.projectId = projectId
+    }
+    runGenerate(docTarget, merged)
+  }, [docTarget, projectId, runGenerate])
+
+  const handleLoadDemo = useCallback(async () => {
+    await setDemoFlag(true)
+    setDemoEnabled(true)
+    await runGenerate('invoice', { mode: 'unit' })
+    await runGenerate('estimate', { mode: 'unit' })
+  }, [runGenerate])
+
+  const handleClearDemo = useCallback(async () => {
+    await setDemoFlag(false)
+    setDemoEnabled(false)
+    setDocResponse(null)
+    setDocError(null)
+    setDocTarget(null)
+    lastDocPayloadRef.current = {}
+  }, [])
+
+  useEffect(() => {
+    loadDemoFlag()
+      .then(flag => {
+        setDemoEnabled(flag)
+        if (flag) {
+          runGenerate('invoice', { mode: 'unit' })
+          runGenerate('estimate', { mode: 'unit' })
+        }
+      })
+      .catch(console.warn)
+  }, [projectId, runGenerate])
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -540,6 +634,28 @@ export default function ChatScreen() {
           </View>
         }
       />
+
+      <View style={[styles.generatorArea, { backgroundColor: colors.background.primary }]}>
+        <DemoBanner active={demoEnabled || !!docResponse?.meta?.demo} />
+        <ActionChips
+          disabled={docLoading}
+          demoEnabled={demoEnabled || !!docResponse?.meta?.demo}
+          onPick={(type, payload) => runGenerate(type, payload)}
+          onLoadDemo={handleLoadDemo}
+          onClearDemo={handleClearDemo}
+        />
+        {docError ? <Text style={styles.generatorError}>{docError}</Text> : null}
+        {docLoading ? <ActivityIndicator style={styles.generatorSpinner} color={colors.primary.DEFAULT} /> : null}
+        {docResponse?.missing_fields?.length ? (
+          <MissingFieldsForm
+            missing={docResponse.missing_fields}
+            onSubmit={handleMissingSubmit}
+          />
+        ) : null}
+        {docResponse && (docResponse.missing_fields?.length ?? 0) === 0 ? (
+          <ResultCard data={docResponse} />
+        ) : null}
+      </View>
 
       {/* QuickPrompts removed: rely on global FAB for actions */}
 
@@ -838,6 +954,20 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  generatorArea: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 8,
+    borderTopWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  generatorError: {
+    color: '#B91C1C',
+  },
+  generatorSpinner: {
+    marginTop: 4,
   },
   editableContent: {
     marginVertical: 4,

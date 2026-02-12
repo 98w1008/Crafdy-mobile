@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   View,
   StyleSheet,
@@ -18,7 +18,7 @@ import { createInvitationCode, getInvitationCodes, InvitationCode } from '@/lib/
 import { supabase } from '@/lib/supabase'
 import * as Haptics from 'expo-haptics'
 // クリップボード機能（Expo対応ラッパー使用）
-import { copyText, pasteText, hasText } from '@/src/utils/clipboard'
+import { copyText } from '@/src/utils/clipboard'
 
 interface Project {
   id: string
@@ -32,7 +32,7 @@ interface ProjectMember {
   project_id: string
   role: string
   started_at: string
-  ended_at?: string
+  ended_at?: string | null
   full_name: string
   email: string
   project_name: string
@@ -49,51 +49,7 @@ export default function ManageLeadsScreen() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [generatingCode, setGeneratingCode] = useState(false)
 
-  useEffect(() => {
-    if (user && profile?.role === 'parent') {
-      loadData()
-    }
-  }, [user, profile])
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      // 並列実行でパフォーマンス向上、個別エラーハンドリング
-      const results = await Promise.allSettled([
-        loadProjects(),
-        loadProjectMembers(),
-        loadInvitationCodes()
-      ])
-      
-      // 失敗した処理があれば警告
-      const failures = results.filter(result => result.status === 'rejected')
-      if (failures.length > 0) {
-        console.warn('一部データの読み込みに失敗:', failures)
-        Alert.alert(
-          '警告',
-          '一部のデータが読み込めませんでした。ネットワーク接続を確認してください。',
-          [{ text: 'OK' }]
-        )
-      }
-    } catch (error) {
-      console.error('データ読み込みエラー:', error)
-      Alert.alert(
-        'エラー',
-        'データの読み込みに失敗しました。アプリを再起動してください。',
-        [{ text: 'OK' }]
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const onRefresh = async () => {
-    setRefreshing(true)
-    await loadData()
-    setRefreshing(false)
-  }
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -110,9 +66,9 @@ export default function ManageLeadsScreen() {
     } catch (error) {
       console.error('プロジェクト取得エラー:', error)
     }
-  }
+  }, [user?.id])
 
-  const loadProjectMembers = async () => {
+  const loadProjectMembers = useCallback(async () => {
     try {
       // 2段階クエリでリレーション問題を回避
       // 1. まず自分が作成したprojectsのIDリストを取得
@@ -156,7 +112,7 @@ export default function ManageLeadsScreen() {
         project_id: member.project_id,
         role: member.role,
         started_at: member.created_at, // projects_usersテーブルの場合
-        ended_at: null, // 現在はendedカラムがないと仮定
+        ended_at: undefined, // 現在はendedカラムがないと仮定
         full_name: member.profiles?.full_name || '不明',
         email: member.profiles?.email || '',
         project_name: member.projects?.name || '不明なプロジェクト',
@@ -166,9 +122,9 @@ export default function ManageLeadsScreen() {
     } catch (error) {
       console.error('プロジェクトメンバー取得エラー:', error)
     }
-  }
+  }, [user?.id])
 
-  const loadInvitationCodes = async () => {
+  const loadInvitationCodes = useCallback(async () => {
     if (!user?.id) return
 
     try {
@@ -181,7 +137,52 @@ export default function ManageLeadsScreen() {
     } catch (error) {
       console.error('招待コード取得エラー:', error)
     }
+  }, [user?.id])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      // 並列実行でパフォーマンス向上、個別エラーハンドリング
+      const results = await Promise.allSettled([
+        loadProjects(),
+        loadProjectMembers(),
+        loadInvitationCodes()
+      ])
+
+      // 失敗した処理があれば警告
+      const failures = results.filter(result => result.status === 'rejected')
+      if (failures.length > 0) {
+        console.warn('一部データの読み込みに失敗:', failures)
+        Alert.alert(
+          '警告',
+          '一部のデータが読み込めませんでした。ネットワーク接続を確認してください。',
+          [{ text: 'OK' }]
+        )
+      }
+    } catch (error) {
+      console.error('データ読み込みエラー:', error)
+      Alert.alert(
+        'エラー',
+        'データの読み込みに失敗しました。アプリを再起動してください。',
+        [{ text: 'OK' }]
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [loadProjects, loadProjectMembers, loadInvitationCodes])
+
+  useEffect(() => {
+    if (user && profile?.role === 'parent') {
+      loadData()
+    }
+  }, [user, profile, loadData])
+
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await loadData()
+    setRefreshing(false)
   }
+
 
   const handleCreateInvitationCode = async () => {
     if (!selectedProject || !user?.id) return
@@ -541,7 +542,7 @@ export default function ManageLeadsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.light.background.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -553,9 +554,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.light.background.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    borderBottomColor: Colors.light.border.light,
     ...Shadows.sm,
   },
   backButton: {
@@ -604,7 +605,7 @@ const styles = StyleSheet.create({
   removeButton: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    backgroundColor: Colors.errorLight,
+    backgroundColor: Colors.semantic.error + '20',
     borderRadius: BorderRadius.sm,
   },
   projectInfo: {
@@ -624,13 +625,13 @@ const styles = StyleSheet.create({
   },
   codeText: {
     fontFamily: 'monospace',
-    fontSize: Typography.lg,
+    fontSize: Typography.sizes.lg,
     letterSpacing: 2,
   },
   copyButton: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.accent[100],
     borderRadius: BorderRadius.sm,
   },
   invitationStatus: {
@@ -645,7 +646,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.light.background.primary,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -653,9 +654,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.light.background.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    borderBottomColor: Colors.light.border.light,
   },
   closeButton: {
     padding: Spacing.sm,
@@ -677,14 +678,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.light.background.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.light.border.medium,
     borderRadius: BorderRadius.lg,
   },
   projectItemSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.accent.DEFAULT,
+    backgroundColor: Colors.accent[100],
   },
   projectItemContent: {
     flex: 1,

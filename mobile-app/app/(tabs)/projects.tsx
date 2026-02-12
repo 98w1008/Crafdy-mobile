@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { useAuth, useRole } from '@/contexts/AuthContext'
 import { useColors, useSpacing, useRadius } from '@/theme/ThemeProvider'
 import { StyledText, Card, StyledButton, Icon } from '@/components/ui'
@@ -32,7 +32,7 @@ interface Project {
 
 
 export default function ProjectsScreen() {
-  const { user, profile } = useAuth()
+  const { user, profile, projectAccess, refreshProjectAccess } = useAuth()
   const userRole = useRole()
   const colors = useColors()
   const spacing = useSpacing()
@@ -40,6 +40,28 @@ export default function ProjectsScreen() {
 
   const [pendingSubmissions, setPendingSubmissions] = useState<SubmissionItem[]>([])
   const [loadingSubmissions, setLoadingSubmissions] = useState(true)
+
+  // 画面フォーカス時にデータを最新化
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshProjectAccess()
+    }, [])
+  )
+
+  // AuthContextのデータをUI用に変換
+  const projects: Project[] = projectAccess.map(access => ({
+    id: access.project_id,
+    name: access.project_name,
+    description: '---', // DBにないのでプレースホルダー
+    status: 'active',   // デフォルト
+    progress: 0,        // デフォルト
+    startDate: access.started_at || '---',
+    endDate: access.ended_at,
+    location: access.prefecture || '未設定',
+    budget: 0,
+    team: [],
+    monthlyCost: 0
+  }))
 
   // 承認待ちの提出物を取得
   useEffect(() => {
@@ -52,10 +74,10 @@ export default function ProjectsScreen() {
         const allSubmissions = await Promise.all(
           projects.map(project => getSubmissions(project.id, user.id))
         )
-        
+
         const flatSubmissions = allSubmissions.flat()
         const pending = flatSubmissions.filter(s => s.status === 'submitted')
-        
+
         setPendingSubmissions(pending)
       } catch (error) {
         console.error('Failed to fetch pending submissions:', error)
@@ -65,62 +87,7 @@ export default function ProjectsScreen() {
     }
 
     fetchPendingSubmissions()
-  }, [user])
-
-  // サンプルプロジェクトデータ（実際にはSupabaseから取得）
-  const projects: Project[] = [
-    {
-      id: '1',
-      name: '新宿オフィスビル建設',
-      description: '地上15階建てオフィスビル新築工事',
-      status: 'active',
-      progress: 65,
-      startDate: '2024-01-15',
-      endDate: '2024-12-30',
-      location: '東京都新宿区',
-      budget: 150000000,
-      team: ['田中', '佐藤', '山田', '鈴木'],
-      monthlyCost: 12500000
-    },
-    {
-      id: '2',
-      name: 'マンション改修工事',
-      description: '築20年マンションの大規模改修',
-      status: 'active',
-      progress: 30,
-      startDate: '2024-02-01',
-      endDate: '2024-08-31',
-      location: '神奈川県横浜市',
-      budget: 80000000,
-      team: ['高橋', '伊藤'],
-      monthlyCost: 8900000
-    },
-    {
-      id: '3',
-      name: '商業施設リニューアル',
-      description: 'ショッピングモール内装工事',
-      status: 'completed',
-      progress: 100,
-      startDate: '2023-10-01',
-      endDate: '2024-01-15',
-      location: '埼玉県さいたま市',
-      budget: 45000000,
-      team: ['渡辺', '加藤'],
-      monthlyCost: 0
-    },
-    {
-      id: '4',
-      name: '住宅建築プロジェクト',
-      description: '戸建て住宅新築工事',
-      status: 'planning',
-      progress: 10,
-      startDate: '2024-04-01',
-      location: '千葉県船橋市',
-      budget: 35000000,
-      team: ['中村'],
-      monthlyCost: 2800000
-    }
-  ]
+  }, [user, projectAccess]) // projectAccessが変わったら再取得
 
 
 
@@ -135,9 +102,9 @@ export default function ProjectsScreen() {
   }
 
   const handleProjectPress = (project: Project) => {
-    router.push({ 
-      pathname: '/projects/[id]/chat', 
-      params: { id: project.id, name: project.name } 
+    router.push({
+      pathname: '/projects/[id]/chat',
+      params: { id: project.id, name: project.name }
     });
   }
 
@@ -150,7 +117,7 @@ export default function ProjectsScreen() {
   }
 
   const renderApprovalSummaryCard = () => {
-    if (userRole !== 'owner' && userRole !== 'admin') {
+    if (userRole !== 'parent') {
       return null // 代表のみ表示
     }
 
@@ -170,11 +137,11 @@ export default function ProjectsScreen() {
             承認待ち
           </StyledText>
         </View>
-        
+
         <StyledText variant="heading2" weight="bold" color="primary" style={styles.approvalCount}>
           {pendingCount}件
         </StyledText>
-        
+
         <StyledText variant="body" color="secondary">
           職長からの提出物をご確認ください
         </StyledText>
@@ -206,7 +173,7 @@ export default function ProjectsScreen() {
       <StyledText variant="heading3" weight="semibold" numberOfLines={2} style={styles.projectName}>
         {project.name}
       </StyledText>
-      
+
       {/* 主要指標を2行で表示 */}
       <View style={styles.metricsContainer}>
         {/* 1行目: 場所・進捗 */}
@@ -224,7 +191,7 @@ export default function ProjectsScreen() {
             </StyledText>
           </View>
         </View>
-        
+
         {/* 2行目: 人数・今月コスト */}
         <View style={styles.metricsRow}>
           <View style={styles.metricItem}>
@@ -246,11 +213,11 @@ export default function ProjectsScreen() {
       {project.progress > 0 && (
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
-            <View 
+            <View
               style={[
-                styles.progressFill, 
+                styles.progressFill,
                 { width: `${project.progress}%` }
-              ]} 
+              ]}
             />
           </View>
         </View>
@@ -279,7 +246,7 @@ export default function ProjectsScreen() {
   )
 
   const styles = createStyles(colors, spacing, radius)
-  
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -322,7 +289,7 @@ export default function ProjectsScreen() {
           )}
         </View>
       </ScrollView>
-      
+
       {/* 統一グローバルFAB */}
       <GlobalFABMenu currentRoute="/(tabs)/projects" />
     </SafeAreaView>

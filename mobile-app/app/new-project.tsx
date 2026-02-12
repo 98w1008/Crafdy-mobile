@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   StyleSheet,
@@ -14,6 +14,7 @@ import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/
 import { StyledText, StyledButton, Card } from '@/components/ui'
 import * as DocumentPicker from 'expo-document-picker'
 import * as Haptics from 'expo-haptics'
+import { useAppMode } from '@/hooks/useAppMode'
 
 interface ProjectDocument {
   id: string
@@ -39,6 +40,20 @@ interface ProjectData {
 export default function NewProjectScreen() {
   const { user, profile } = useAuth()
   const userRole = useRole()
+  const { mode, isLoading } = useAppMode()
+
+  // PRODモードガード: PRODの場合は新しい project-create にリダイレクト
+  useEffect(() => {
+    if (!isLoading && mode === 'prod') {
+      router.replace('/project-create')
+    }
+  }, [mode, isLoading])
+
+  // PRODモードの場合はローディング中は何も表示しない
+  if (isLoading || mode === 'prod') {
+    return null
+  }
+
   const [step, setStep] = useState<'upload' | 'analysis' | 'generation' | 'dialogue' | 'confirmation'>('upload')
   const [loading, setLoading] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
@@ -46,7 +61,7 @@ export default function NewProjectScreen() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [aiResponses, setAiResponses] = useState<string[]>([])
   const [inputText, setInputText] = useState('')
-  
+
   const [projectData, setProjectData] = useState<ProjectData>({
     name: '',
     description: '',
@@ -154,12 +169,12 @@ export default function NewProjectScreen() {
   const validateBasicInfo = (): boolean => {
     const required = ['name', 'description', 'location', 'budget', 'startDate', 'clientName']
     const missing = required.filter(field => !projectData[field as keyof ProjectData])
-    
+
     if (missing.length > 0) {
       Alert.alert('入力エラー', '必須項目をすべて入力してください')
       return false
     }
-    
+
     return true
   }
 
@@ -168,7 +183,7 @@ export default function NewProjectScreen() {
     setStep('analysis')
     setLoading(true)
     setAnalysisProgress(0)
-    
+
     try {
       // 段階的な解析プロセスをシミュレート
       const analysisSteps = [
@@ -178,22 +193,22 @@ export default function NewProjectScreen() {
         { progress: 80, message: 'プロジェクト情報を生成中...' },
         { progress: 100, message: '解析完了' }
       ]
-      
+
       for (const step of analysisSteps) {
         await new Promise(resolve => setTimeout(resolve, 1200))
         setAnalysisProgress(step.progress)
       }
-      
+
       // AI解析結果をプロジェクトデータに反映（模擬）
       const aiGeneratedData = await generateProjectFromDocuments()
       setProjectData(aiGeneratedData)
-      
+
       // 不足情報についての質問を生成
       const questions = generateAIQuestions(aiGeneratedData)
       setAiQuestions(questions)
-      
+
       setStep('generation')
-      
+
     } catch (error) {
       console.error('AI解析エラー:', error)
       Alert.alert('エラー', 'AI解析に失敗しました')
@@ -205,7 +220,7 @@ export default function NewProjectScreen() {
   // 書類からプロジェクト情報を生成（模擬AI処理）
   const generateProjectFromDocuments = async (): Promise<ProjectData> => {
     await new Promise(resolve => setTimeout(resolve, 500))
-    
+
     return {
       name: '新宿オフィスビル建設プロジェクト',
       description: '地上15階建て、延床面積12,000㎡のオフィスビル新築工事。鉄骨造、外装はカーテンウォール仕様。',
@@ -221,22 +236,22 @@ export default function NewProjectScreen() {
   // AI質問生成
   const generateAIQuestions = (data: ProjectData): string[] => {
     const questions = []
-    
+
     if (!data.clientContact) {
       questions.push('発注者の連絡先（電話番号またはメールアドレス）を教えてください。')
     }
-    
+
     questions.push('現場の安全管理責任者はどなたになりますか？')
     questions.push('工事期間中の作業時間帯に制限はありますか？（例：平日8-17時のみ）')
     questions.push('近隣への騒音配慮で特別な対策が必要でしょうか？')
     questions.push('材料搬入のためのクレーン設置場所は確保済みですか？')
-    
+
     return questions
   }
 
   const handleNext = () => {
     const uploadedPrimary = primaryDocuments.filter(doc => doc.uploaded)
-    
+
     if (step === 'upload') {
       if (uploadedPrimary.length < 3) {
         Alert.alert(
@@ -246,7 +261,7 @@ export default function NewProjectScreen() {
         )
         return
       }
-      
+
       startAIAnalysis()
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
     } else if (step === 'generation') {
@@ -266,19 +281,19 @@ export default function NewProjectScreen() {
   // AI対話処理
   const handleAIResponse = () => {
     if (!inputText.trim()) return
-    
+
     const newResponses = [...aiResponses]
     newResponses[currentQuestionIndex] = inputText
     setAiResponses(newResponses)
     setInputText('')
-    
+
     if (currentQuestionIndex < aiQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1)
     } else {
       // すべての質問が完了
       setStep('confirmation')
     }
-    
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
   }
 
@@ -329,18 +344,18 @@ export default function NewProjectScreen() {
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0]
-        setPrimaryDocuments(prev => prev.map(doc => 
-          doc.id === documentId 
-            ? { 
-                ...doc, 
-                uri: asset.uri, 
-                name: asset.name || doc.name,
-                size: asset.size || 0,
-                uploaded: true 
-              }
+        setPrimaryDocuments(prev => prev.map(doc =>
+          doc.id === documentId
+            ? {
+              ...doc,
+              uri: asset.uri,
+              name: asset.name || doc.name,
+              size: asset.size || 0,
+              uploaded: true
+            }
             : doc
         ))
-        
+
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       }
     } catch (error) {
@@ -350,8 +365,8 @@ export default function NewProjectScreen() {
   }
 
   const removePrimaryDocument = (documentId: string) => {
-    setPrimaryDocuments(prev => prev.map(doc => 
-      doc.id === documentId 
+    setPrimaryDocuments(prev => prev.map(doc =>
+      doc.id === documentId
         ? { ...doc, uri: '', uploaded: false, size: 0 }
         : doc
     ))
@@ -360,7 +375,7 @@ export default function NewProjectScreen() {
 
   const createProject = async () => {
     setLoading(true)
-    
+
     try {
       // ここで実際にはSupabaseにプロジェクトを作成
       const newProject = {
@@ -371,12 +386,12 @@ export default function NewProjectScreen() {
         created_at: new Date().toISOString(),
         status: 'planning'
       }
-      
+
       console.log('🏗️ Creating AI-generated project:', newProject)
-      
+
       // 作成処理をシミュレート
       await new Promise(resolve => setTimeout(resolve, 2000))
-      
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       Alert.alert(
         'プロジェクト作成完了',
@@ -385,7 +400,7 @@ export default function NewProjectScreen() {
           { text: 'OK', onPress: () => router.replace('/(tabs)/projects') }
         ]
       )
-      
+
     } catch (error) {
       console.error('プロジェクト作成エラー:', error)
       Alert.alert('エラー', 'プロジェクトの作成に失敗しました')
@@ -421,7 +436,7 @@ export default function NewProjectScreen() {
         <StyledText variant="caption" color="secondary" style={{ marginBottom: Spacing.md }}>
           以下の3点をアップロードしてください
         </StyledText>
-        
+
         {primaryDocuments.map((doc, index) => (
           <View key={doc.id} style={styles.documentItem}>
             <View style={styles.documentInfo}>
@@ -439,7 +454,7 @@ export default function NewProjectScreen() {
                 {doc.id === 'estimate' && '材料費、工事費などのコスト情報を取得'}
               </StyledText>
             </View>
-            
+
             {doc.uploaded ? (
               <View style={styles.documentActions}>
                 <TouchableOpacity
@@ -493,14 +508,14 @@ export default function NewProjectScreen() {
               解析進捗: {analysisProgress}%
             </StyledText>
           </View>
-          
+
           <View style={styles.progressBar}>
             <View style={[
               styles.progressFill,
               { width: `${analysisProgress}%` }
             ]} />
           </View>
-          
+
           <View style={styles.analysisSteps}>
             <View style={[styles.analysisStep, analysisProgress >= 20 && styles.analysisStepCompleted]}>
               <StyledText variant="body">契約書の解析</StyledText>
@@ -542,32 +557,32 @@ export default function NewProjectScreen() {
         <StyledText variant="subtitle" weight="semibold" style={styles.generationTitle}>
           生成されたプロジェクト情報
         </StyledText>
-        
+
         <View style={styles.generatedData}>
           <View style={styles.dataRow}>
             <StyledText variant="body" weight="medium" color="primary">プロジェクト名</StyledText>
             <StyledText variant="body">{projectData.name}</StyledText>
           </View>
-          
+
           <View style={styles.dataRow}>
             <StyledText variant="body" weight="medium" color="primary">所在地</StyledText>
             <StyledText variant="body">{projectData.location}</StyledText>
           </View>
-          
+
           <View style={styles.dataRow}>
             <StyledText variant="body" weight="medium" color="primary">予算</StyledText>
             <StyledText variant="body" color="success" weight="semibold">
               ¥{parseInt(projectData.budget).toLocaleString()}万円
             </StyledText>
           </View>
-          
+
           <View style={styles.dataRow}>
             <StyledText variant="body" weight="medium" color="primary">工期</StyledText>
             <StyledText variant="body">
               {projectData.startDate} ～ {projectData.endDate}
             </StyledText>
           </View>
-          
+
           <View style={styles.dataRow}>
             <StyledText variant="body" weight="medium" color="primary">発注者</StyledText>
             <StyledText variant="body">{projectData.clientName}</StyledText>
@@ -575,7 +590,7 @@ export default function NewProjectScreen() {
         </View>
 
         <View style={styles.divider} />
-        
+
         <StyledText variant="body" weight="medium" color="primary" style={{ marginBottom: Spacing.sm }}>
           概要
         </StyledText>
@@ -645,7 +660,7 @@ export default function NewProjectScreen() {
             placeholderTextColor={Colors.textTertiary}
             autoFocus
           />
-          
+
           <View style={styles.dialogueActions}>
             <StyledButton
               title="スキップ"
@@ -699,7 +714,7 @@ export default function NewProjectScreen() {
         <StyledText variant="subtitle" weight="semibold" style={styles.confirmationTitle}>
           プロジェクト情報
         </StyledText>
-        
+
         <View style={styles.confirmationContent}>
           <View style={styles.confirmRow}>
             <StyledText variant="body" weight="medium">プロジェクト名:</StyledText>
@@ -728,7 +743,7 @@ export default function NewProjectScreen() {
         <StyledText variant="subtitle" weight="semibold" style={styles.confirmationTitle}>
           アップロード書類
         </StyledText>
-        
+
         <View style={styles.confirmationContent}>
           <StyledText variant="body" weight="medium" color="success">
             AI解析書類: {primaryDocuments.filter(doc => doc.uploaded).length}/3件
@@ -772,7 +787,7 @@ export default function NewProjectScreen() {
   const getStepNumber = () => {
     switch (step) {
       case 'upload': return 1
-      case 'analysis': return 2  
+      case 'analysis': return 2
       case 'generation': return 3
       case 'dialogue': return 4
       case 'confirmation': return 5
@@ -808,10 +823,10 @@ export default function NewProjectScreen() {
           <StyledText variant="caption" color="secondary">
             ステップ {getStepNumber()}/5 - {
               step === 'upload' ? '書類アップロード' :
-              step === 'analysis' ? 'AI解析中' :
-              step === 'generation' ? 'AI生成結果' :
-              step === 'dialogue' ? 'AI対話' :
-              '最終確認'
+                step === 'analysis' ? 'AI解析中' :
+                  step === 'generation' ? 'AI生成結果' :
+                    step === 'dialogue' ? 'AI対話' :
+                      '最終確認'
             }
           </StyledText>
         </View>

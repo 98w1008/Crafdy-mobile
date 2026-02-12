@@ -13,7 +13,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { useColors, useSpacing, useRadius } from '@/theme/ThemeProvider'
 import { StyledText, StyledButton, Card } from '@/components/ui'
 import { DocumentUploader, UploadedFile } from '@/components/upload/DocumentUploader'
@@ -33,7 +33,8 @@ interface EstimateFormData {
   siteLocation: string
   contractType: 'material_labor' | 'labor_only' | 'daily_hire'  // 材工 | 手間 | 常用
   billingType: 'completion' | 'milestone'  // 出来高 | マイルストン
-  
+  prospectId?: string
+
   // Step 2: 統合アップロード（AI自動判別対応）
   uploadedFiles: UploadedFile[]
   aiAnalysisResults?: {
@@ -48,7 +49,7 @@ interface EstimateFormData {
     equipment: EquipmentItem[]
     specialRequirements: string[]
   }
-  
+
   // Step 3: 生成された見積もり結果
   generatedEstimate?: {
     items: EstimateItem[]
@@ -118,16 +119,47 @@ export default function EstimateWizard() {
   const colors = useColors()
   const spacing = useSpacing()
   const radius = useRadius()
+  const params = useLocalSearchParams()
   const [currentStep, setCurrentStep] = useState<WizardStep>(1)
+
+  // 初期データのパース
+  const initialEstimateData = params.estimate_data
+    ? JSON.parse(params.estimate_data as string)
+    : null
+
   const [formData, setFormData] = useState<EstimateFormData>({
-    estimateName: '',
-    clientName: '',
-    siteLocation: '',
+    estimateName: initialEstimateData?.project_scope?.type === 'renovation' ? '改修工事見積書' : '工事見積書',
+    clientName: initialEstimateData?.client?.name || '',
+    siteLocation: params.prospect_id ? '現場未設定（仮案件）' : '',
     contractType: 'material_labor',
     billingType: 'completion',
     uploadedFiles: [],
+    prospectId: params.prospect_id as string,
+    generatedEstimate: initialEstimateData ? {
+      items: initialEstimateData.items.map((item: any) => ({
+        category: item.category === 'labor' ? '労務費' :
+          item.category === 'material' ? '材料費' :
+            item.category === 'equipment' ? '機械経費' : '諸経費',
+        itemName: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPrice: item.adjusted_unit_price,
+        amount: item.total_price
+      })),
+      subtotal: initialEstimateData.summary.subtotal,
+      tax: initialEstimateData.summary.tax,
+      total: initialEstimateData.summary.total,
+      evidence: initialEstimateData.ai_insights.recommendations
+    } : undefined
   })
   const [loading, setLoading] = useState(false)
+
+  // 初期データがある場合はステップ3へ（AI分析済みの場合）
+  React.useEffect(() => {
+    if (initialEstimateData) {
+      setCurrentStep(3)
+    }
+  }, [])
 
   // =============================================================================
   // STEP NAVIGATION
@@ -194,12 +226,12 @@ export default function EstimateWizard() {
       )
       return false
     }
-    
+
     // 必要なドキュメントタイプの確認
     const docTypes = formData.uploadedFiles.map(f => f.docType)
     const hasDrawing = docTypes.includes('drawing')
     const hasSpec = docTypes.includes('spec')
-    
+
     if (!hasDrawing && !hasSpec) {
       Alert.alert(
         '推奨書類不足',
@@ -210,7 +242,7 @@ export default function EstimateWizard() {
         ]
       )
     }
-    
+
     return true
   }
 
@@ -220,17 +252,17 @@ export default function EstimateWizard() {
 
   const handlePDFExport = async () => {
     if (!formData.generatedEstimate) return
-    
+
     try {
       setLoading(true)
-      
+
       // 簡単なPDFテンプレートを作成（expo-print使用）
       const htmlContent = generatePDFTemplate(formData)
-      
+
       // TODO: expo-printでPDF生成
       // const { uri } = await Print.printToFileAsync({ html: htmlContent })
       // await Sharing.shareAsync(uri)
-      
+
       Alert.alert(
         'PDF作成完了',
         `${formData.estimateName}のPDF見積書を作成しました。\n\n含まれる内容:\n• 見積書ヘッダー\n• 詳細内訳表\n• 総合計\n• 根拠サマリ`,
@@ -243,11 +275,11 @@ export default function EstimateWizard() {
       setLoading(false)
     }
   }
-  
+
   const generatePDFTemplate = (data: EstimateFormData): string => {
     const { generatedEstimate } = data
     if (!generatedEstimate) return ''
-    
+
     return `
       <html>
         <head>
@@ -316,20 +348,20 @@ export default function EstimateWizard() {
 
   const handleExcelExport = async () => {
     if (!formData.generatedEstimate) return
-    
+
     try {
       setLoading(true)
-      
+
       // Excelデータ構造を作成
       const excelData = generateExcelData(formData)
-      
+
       // TODO: xlsxライブラリでExcelファイル生成
       // import * as XLSX from 'xlsx'
       // const wb = XLSX.utils.book_new()
       // XLSX.utils.book_append_sheet(wb, excelData.estimateSheet, '見積明細')
       // XLSX.utils.book_append_sheet(wb, excelData.summarySheet, '集計表')
       // const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' })
-      
+
       Alert.alert(
         'Excel作成完了',
         `${formData.estimateName}のExcel明細を作成しました。\n\n含まれるシート:\n• 見積明細シート\n• 集計表シート\n• データ入力シート`,
@@ -342,11 +374,11 @@ export default function EstimateWizard() {
       setLoading(false)
     }
   }
-  
+
   const generateExcelData = (data: EstimateFormData) => {
     const { generatedEstimate } = data
     if (!generatedEstimate) return null
-    
+
     const estimateSheet = [
       ['項目名', '数量', '単位', '単価', '金額'],
       ...generatedEstimate.items.map(item => [
@@ -361,7 +393,7 @@ export default function EstimateWizard() {
       ['消費税(10%)', '', '', '', generatedEstimate.tax],
       ['合計', '', '', '', generatedEstimate.total]
     ]
-    
+
     const summarySheet = [
       ['見積書情報'],
       ['見積名', data.estimateName],
@@ -372,32 +404,32 @@ export default function EstimateWizard() {
       ['算出根拠'],
       ...generatedEstimate.evidence.map(e => [e])
     ]
-    
+
     return { estimateSheet, summarySheet }
   }
 
   const handleChatAttach = async () => {
     if (!formData.generatedEstimate) return
-    
+
     try {
       setLoading(true)
-      
+
       const { generatedEstimate } = formData
       const estimateText = formatEstimateForChat(formData, generatedEstimate)
-      
+
       Alert.alert(
         'チャットに貼付',
         `${formData.estimateName}の見積もりをチャットに投稿しますか？\n\n含まれる情報:\n• 詳細内訳表\n• 合計金額\n• PDF/Excelダウンロードボタン`,
         [
           { text: 'キャンセル', style: 'cancel' },
-          { 
-            text: 'チャットに投稿', 
+          {
+            text: 'チャットに投稿',
             onPress: async () => {
               try {
                 // TODO: 実際のチャット投稿処理
                 // チャットメッセージとして送信
                 await simulateChatPost(estimateText)
-                
+
                 Alert.alert(
                   '投稿完了 ✓',
                   '見積もりをチャットに投稿しました。\nPDF/Excelダウンロードボタンも追加されています。',
@@ -417,7 +449,7 @@ export default function EstimateWizard() {
       setLoading(false)
     }
   }
-  
+
   const formatEstimateForChat = (data: EstimateFormData, estimate: NonNullable<EstimateFormData['generatedEstimate']>): string => {
     return `
 **${data.estimateName}** の見積もりが完成しました！
@@ -428,9 +460,9 @@ export default function EstimateWizard() {
 • 作成日: ${new Date().toLocaleDateString('ja-JP')}
 
 **見積明細**
-${estimate.items.map((item, index) => 
-  `${index + 1}. ${item.itemName}\n   ${item.quantity}${item.unit} × ¥${item.unitPrice.toLocaleString()} = **¥${item.amount.toLocaleString()}**`
-).join('\n\n')}
+${estimate.items.map((item, index) =>
+      `${index + 1}. ${item.itemName}\n   ${item.quantity}${item.unit} × ¥${item.unitPrice.toLocaleString()} = **¥${item.amount.toLocaleString()}**`
+    ).join('\n\n')}
 
 **合計金額**
 • 小計: ¥${estimate.subtotal.toLocaleString()}
@@ -444,7 +476,7 @@ ${estimate.evidence.map(e => `• ${e}`).join('\n')}
 PDF見積書 | Excel明細 ダウンロード可能
     `.trim()
   }
-  
+
   const simulateChatPost = async (message: string): Promise<void> => {
     // チャット投稿のシミュレーション
     return new Promise((resolve) => {
@@ -464,10 +496,10 @@ PDF見積書 | Excel明細 ダウンロード可能
     try {
       // Step 1: ドキュメント解析
       const analysisResults = await analyzeUploadedDocuments()
-      
+
       // Step 2: AI見積生成（解析結果を元に）
       const aiEstimate = await generateAIEstimate(analysisResults)
-      
+
       setFormData(prev => ({
         ...prev,
         generatedEstimate: aiEstimate,
@@ -483,7 +515,7 @@ PDF見積書 | Excel明細 ダウンロード可能
 
   const analyzeUploadedDocuments = async () => {
     console.log('🤖 ドキュメント解析開始:', formData.uploadedFiles.length, '件')
-    
+
     const detectedDocuments: AIDetectedDocument[] = []
     let extractedData: ExtractedEstimateData = {
       projectDetails: {},
@@ -491,13 +523,13 @@ PDF見積書 | Excel明細 ダウンロード可能
       laborRequirements: [],
       equipmentNeeds: []
     }
-    
+
     // 各ファイルを解析（実際のAI処理をシミュレート）
     for (const file of formData.uploadedFiles) {
       await new Promise(resolve => setTimeout(resolve, 300)) // 解析演出
-      
+
       let fileAnalysis: any = {}
-      
+
       switch (file.docType) {
         case 'drawing':
           fileAnalysis = {
@@ -540,14 +572,14 @@ PDF見積書 | Excel明細 ダウンロード可能
           }
           break
       }
-      
+
       detectedDocuments.push({
         fileId: file.id,
         docType: file.docType as any,
         extractedData: fileAnalysis,
         confidence: 0.85 + Math.random() * 0.1
       })
-      
+
       // データを統合
       if (fileAnalysis.materials) {
         extractedData.materials.push(...fileAnalysis.materials)
@@ -559,7 +591,7 @@ PDF見積書 | Excel明細 ダウンロード可能
         extractedData.equipmentNeeds.push(...fileAnalysis.equipmentNeeds)
       }
     }
-    
+
     return {
       detectedDocuments,
       extractedData,
@@ -574,11 +606,11 @@ PDF見積書 | Excel明細 ダウンロード可能
 
   const generateAIEstimate = async (analysisResults: any) => {
     console.log('🎯 AI見積生成:', analysisResults)
-    
+
     // 解析結果から見積項目を生成
     const items: EstimateItem[] = []
     let runningTotal = 0
-    
+
     // 材料費の計算
     analysisResults.extractedData.materials.forEach((material: MaterialItem) => {
       const amount = material.quantity * material.estimatedCost
@@ -592,7 +624,7 @@ PDF見積書 | Excel明細 ダウンロード可能
       })
       runningTotal += amount
     })
-    
+
     // 労務費の計算
     analysisResults.extractedData.laborRequirements.forEach((labor: LaborItem) => {
       const amount = labor.hours * labor.estimatedRate
@@ -606,7 +638,7 @@ PDF見積書 | Excel明細 ダウンロード可能
       })
       runningTotal += amount
     })
-    
+
     // 機械経費の計算
     analysisResults.extractedData.equipmentNeeds.forEach((equipment: EquipmentItem) => {
       const amount = equipment.duration * equipment.estimatedCost
@@ -620,7 +652,7 @@ PDF見積書 | Excel明細 ダウンロード可能
       })
       runningTotal += amount
     })
-    
+
     // 諸経費（5%）
     const overhead = Math.floor(runningTotal * 0.05)
     items.push({
@@ -631,11 +663,11 @@ PDF見積書 | Excel明細 ダウンロード可能
       unitPrice: overhead,
       amount: overhead
     })
-    
+
     const subtotal = runningTotal + overhead
     const tax = Math.floor(subtotal * 0.1)
     const total = subtotal + tax
-    
+
     return {
       items,
       subtotal,
@@ -691,7 +723,7 @@ PDF見積書 | Excel明細 ダウンロード可能
         <StyledText variant="subtitle" weight="semibold" style={styles.sectionTitle}>
           基本情報
         </StyledText>
-        
+
         {/* 見積名 */}
         <View style={styles.inputGroup}>
           <StyledText variant="body" weight="medium" style={styles.inputLabel}>
@@ -726,12 +758,22 @@ PDF見積書 | Excel明細 ダウンロード可能
             現場名 *
           </StyledText>
           <TextInput
-            style={[styles.textInput, { backgroundColor: colors.background.primary }]}
+            style={[
+              styles.textInput,
+              { backgroundColor: colors.background.primary },
+              formData.prospectId && { color: colors.text.secondary, fontStyle: 'italic' }
+            ]}
             placeholder="例：〇〇ビル新築工事"
             value={formData.siteLocation}
             onChangeText={(text) => setFormData(prev => ({ ...prev, siteLocation: text }))}
             placeholderTextColor={colors.text.tertiary}
+            editable={!formData.prospectId}
           />
+          {formData.prospectId && (
+            <StyledText variant="caption" color="primary" style={{ marginTop: 4 }}>
+              ※ 現場未設定のため、後ほど現場登録が必要です
+            </StyledText>
+          )}
         </View>
 
         {/* 契約形態 */}
@@ -830,19 +872,19 @@ PDF見積書 | Excel明細 ダウンロード可能
             <StyledText variant="subtitle" weight="semibold">
               📊 AI解析プレビュー
             </StyledText>
-            <Chip 
-              mode="outlined" 
-              compact 
+            <Chip
+              mode="outlined"
+              compact
               style={{ backgroundColor: colors.primary.DEFAULT + '20' }}
             >
               {formData.uploadedFiles.length}件
             </Chip>
           </View>
-          
+
           <StyledText variant="body" color="secondary" style={styles.analysisDescription}>
             アップロードされたファイルから以下の情報を自動抽出します：
           </StyledText>
-          
+
           <View style={styles.detectionList}>
             {[
               { icon: '📐', text: '図面から面積・数量を自動計算', detected: formData.uploadedFiles.some(f => f.docType === 'drawing') },
@@ -860,13 +902,13 @@ PDF見積書 | Excel明細 ダウンロード可能
               </View>
             ))}
           </View>
-          
+
           {formData.aiAnalysisResults && (
             <View style={styles.confidenceSection}>
               <StyledText variant="body" weight="medium">AI信頼度</StyledText>
               <View style={styles.confidenceBar}>
-                <ProgressBar 
-                  progress={formData.aiAnalysisResults.confidence} 
+                <ProgressBar
+                  progress={formData.aiAnalysisResults.confidence}
                   color={colors.success}
                   style={{ height: 8, borderRadius: 4 }}
                 />
@@ -878,7 +920,7 @@ PDF見積書 | Excel明細 ダウンロード可能
           )}
         </Card>
       )}
-      
+
       {/* スマート事前入力の提案 */}
       {formData.uploadedFiles.length > 0 && (
         <Card style={styles.smartFillCard}>
@@ -888,7 +930,7 @@ PDF見積書 | Excel明細 ダウンロード可能
           <StyledText variant="caption" color="secondary">
             次のステップで、解析結果に基づいて見積項目を自動入力します
           </StyledText>
-          
+
           <View style={styles.previewList}>
             <StyledText variant="caption" color="primary">• 材料費の自動計算</StyledText>
             <StyledText variant="caption" color="primary">• 労務時間の推定</StyledText>
@@ -921,7 +963,7 @@ PDF見積書 | Excel明細 ダウンロード可能
     }
 
     const { generatedEstimate } = formData
-    
+
     return (
       <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
         <Card style={styles.resultCard}>
@@ -945,7 +987,7 @@ PDF見積書 | Excel明細 ダウンロード可能
                 金額
               </StyledText>
             </View>
-            
+
             {generatedEstimate.items.map((item, index) => (
               <View key={index} style={styles.tableRow}>
                 <View style={styles.itemInfo}>
@@ -1023,6 +1065,25 @@ PDF見積書 | Excel明細 ダウンロード可能
               style={styles.outputButton}
             />
           </View>
+
+          {/* 現場登録導線（Prospectの場合） */}
+          {formData.prospectId && (
+            <Card variant="surface" style={{ marginTop: 16, padding: 16, backgroundColor: colors.primary.DEFAULT + '10' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <IconButton icon="office-building-plus" size={24} iconColor={colors.primary.DEFAULT} />
+                <View style={{ flex: 1 }}>
+                  <StyledText variant="body" weight="semibold">現場が未登録です</StyledText>
+                  <StyledText variant="caption" color="secondary">請求書を作成するには現場登録が必要です</StyledText>
+                </View>
+                <StyledButton
+                  title="現場登録"
+                  variant="primary"
+                  size="sm"
+                  onPress={() => router.push('/new-project')}
+                />
+              </View>
+            </Card>
+          )}
         </Card>
       </ScrollView>
     )
@@ -1072,21 +1133,21 @@ PDF見積書 | Excel明細 ダウンロード可能
   // =============================================================================
 
   const styles = createStyles(colors, spacing, radius)
-  
+
   return (
     <SafeAreaView style={styles.container}>
       {renderHeader()}
-      
+
       {currentStep === 1 && renderStep1()}
       {currentStep === 2 && renderStep2()}
       {currentStep === 3 && renderStep3()}
-      
+
       {/* AI解析状況のフローティングインジケーター */}
       {loading && currentStep === 2 && (
         <View style={styles.floatingIndicator}>
           <Card style={styles.floatingCard}>
             <View style={styles.floatingContent}>
-              <StyledText variant="body" color="primary" style={styles.loadingIcon}>🤖</StyledText>
+              <StyledText variant="body" color="primary" style={styles.floatingIcon}>🤖</StyledText>
               <View>
                 <StyledText variant="body" weight="medium">AI解析中...</StyledText>
                 <StyledText variant="caption" color="secondary">
@@ -1097,7 +1158,7 @@ PDF見積書 | Excel明細 ダウンロード可能
           </Card>
         </View>
       )}
-      
+
       {renderFooter()}
     </SafeAreaView>
   )
@@ -1351,7 +1412,7 @@ const createStyles = (colors: any, spacing: any, radius: any) => StyleSheet.crea
     gap: 12,
     padding: 16,
   },
-  loadingIcon: {
+  floatingIcon: {
     fontSize: 24,
   },
 })

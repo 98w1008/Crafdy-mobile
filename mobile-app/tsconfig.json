@@ -9,6 +9,7 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "jsx": "react-jsx",
+    "baseUrl": ".",
     "target": "esnext",
     "module": "esnext",
     "lib": [
@@ -21,28 +22,16 @@
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": [
+        "src/*",
         "./*"
-      ],
-      "@/components/*": [
-        "./components/*"
-      ],
-      "@/constants/*": [
-        "./constants/*"
-      ],
-      "@/hooks/*": [
-        "./hooks/*"
-      ],
-      "@/types/*": [
-        "./types/*"
-      ],
-      "@/lib/*": [
-        "./lib/*"
       ]
     }
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
   ],
   "exclude": [
     "node_modules"

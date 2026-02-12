@@ -318,7 +318,6 @@ export const DesignTokens = {
 
 // Individual exports for backward compatibility
 export { BaseColors }
-export { LightColors, DarkColors }
 
 // Default export
 export default DesignTokens

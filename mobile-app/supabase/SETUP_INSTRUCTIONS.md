@@ -13,6 +13,11 @@
 
 1. Supabaseプロジェクトにログインしてください
 2. 対象のプロジェクトのダッシュボードを開いてください
+3. OTPレート制限を有効化するために `supabase/config.toml` を最新化してください（後述）
+
+### OTPレート制限（必須）
+
+`mobile-app/supabase/config.toml` では `/otp` エンドポイントのレート制限をメール/SMS/検証それぞれ 60 秒あたり 3〜10 回に抑える設定を追加しています。Supabase CLI を利用している場合は `supabase start` 時に自動で反映されます。既存プロジェクトに適用する際はダッシュボードの **Settings → Configuration → Auth** で同等の設定値を入力するか、`supabase deploy` を実行してください。
 
 ## 🚀 実装手順
 
