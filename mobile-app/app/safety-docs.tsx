@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import Constants from 'expo-constants'
 import { useAuth } from '@/contexts/AuthContext'
-import { useUiTheme } from '@/src/ui/theme'
+import { useUiTheme } from '@/ui/theme'
 type BlocksTable = {
   columns: string[]
   rows: string[][]
