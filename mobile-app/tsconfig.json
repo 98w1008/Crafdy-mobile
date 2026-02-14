@@ -20,9 +20,9 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ],
+      "@/ui/*": ["./src/ui/*"],
+      "@/screens/*": ["./src/screens/*"],
+      "@/*": ["./*"],
       "@/components/*": [
         "./components/*"
       ],
