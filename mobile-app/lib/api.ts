@@ -1,6 +1,17 @@
 import { supabase } from './supabase'
 import { safeJSONStringify, sanitizeUnicodeForJSON } from './unicode-utils'
 
+// --- Demo flag loader (used by AuthContext) ---
+// NOTE: Keep this minimal. We avoid importing appMode from mobile-app/src/* because src is currently git-ignored.
+export async function loadDemoFlag(): Promise<boolean> {
+  try {
+    // Prefer explicit Expo public env when available.
+    return process.env.EXPO_PUBLIC_APP_MODE === 'demo'
+  } catch {
+    return false
+  }
+}
+
 // API型定義
 export interface ApiResponse<T = any> {
   success: boolean
