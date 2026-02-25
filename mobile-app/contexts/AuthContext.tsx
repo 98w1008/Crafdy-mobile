@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { Session, User } from '@supabase/supabase-js'
-import { supabase, supabaseReady } from '@/lib/supabase'
+import { supabase, supabaseReady, probeAuthSettingsOnce } from '@/lib/supabase'
 import { loadDemoFlag } from '@/lib/api'
 import { setAccessToken as setStoredAccessToken } from '@/lib/token-store'
 
@@ -256,8 +256,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!data?.session) {
           try {
             await supabase.auth.signInAnonymously()
-          } catch (error) {
-            console.warn('⚠️ Anonymous sign-in failed', error)
+          } catch (error: any) {
+            const probe = await probeAuthSettingsOnce()
+            const cause = (probe.status === 401 || probe.status === 403)
+              ? `key mismatch (probe status=${probe.status})`
+              : probe.err
+                ? `network unreachable (probe err=${probe.err})`
+                : `unknown (probe status=${probe.status})`
+
+            console.warn('⚠️ Anonymous sign-in failed')
+            console.warn('⚠️', cause)
           }
         }
       })
@@ -359,14 +367,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
           try {
             const { data: anonData, error: anonError } = await supabase!.auth.signInAnonymously()
             if (anonError) {
-              console.error('⚠️ Anonymous sign-in failed:', anonError)
+              const probe = await probeAuthSettingsOnce()
+              console.error('⚠️ Anonymous sign-in failed')
+              console.error('⚠️', (probe.status === 401 || probe.status === 403)
+                ? `key mismatch (probe status=${probe.status})`
+                : probe.err
+                  ? `network unreachable (probe err=${probe.err})`
+                  : `unknown (probe status=${probe.status})`
+              )
             } else if (anonData.session && mounted) {
               console.log('✅ Anonymous sign-in successful:', anonData.session.user.id)
               // onAuthStateChange(SIGNED_IN) が発火するはずだが、念のためここでもセットアップ
               await setupSession(anonData.session)
             }
-          } catch (e) {
-            console.error('⚠️ Anonymous sign-in exception:', e)
+          } catch (e: any) {
+            const probe = await probeAuthSettingsOnce()
+            console.error('⚠️ Anonymous sign-in exception')
+            console.error('⚠️', probe.err ? `network unreachable (probe err=${probe.err})` : `probe status=${probe.status}`)
           }
         }
 
