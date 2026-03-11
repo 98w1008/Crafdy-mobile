@@ -187,7 +187,6 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
               <Stack.Screen name="main-chat" options={{ headerShown: false }} />
               <Stack.Screen name="settings" options={{ headerShown: false }} />
-              <Stack.Screen name="site-selector" options={{ headerShown: false }} />
               <Stack.Screen name="new-project" options={{ headerShown: false }} />
               <Stack.Screen name="project-detail/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="estimate/new" options={{ headerShown: false }} />
