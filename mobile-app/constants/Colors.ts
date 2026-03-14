@@ -169,29 +169,44 @@ const Semantic = {
 export const Colors = {
   // Single accent color system
   accent: Accent,
-  
+
   // Theme-specific colors
   light: LightTheme,
   dark: DarkTheme,
-  
+
   // Shadow system (primarily for light theme)
   shadows: Shadows,
-  
+
   // Legacy shadow API support
   shadow: {
     DEFAULT: '#000000',
     ...Shadows,
   },
-  
+
   // Semantic colors
   semantic: Semantic,
-  
-  // Legacy support - will be gradually deprecated
-  primary: Accent,              // Map old primary to accent
-  base: LightTheme.background,  // Map old base to light theme
-  text: LightTheme.text,        // Map old text to light theme
-  border: LightTheme.border,    // Map old border to light theme
-  
+
+  // ---------------------------------------------------------------------------
+  // Legacy flat tokens (Auth screens rely on these)
+  // NOTE: Keep these as LIGHT defaults to ensure readable auth UI.
+  // ---------------------------------------------------------------------------
+  background: LightTheme.background.primary,
+  surface: LightTheme.background.surface,
+  elevated: LightTheme.background.elevated,
+  border: LightTheme.border.light,
+
+  text: LightTheme.text.primary,
+  textSecondary: LightTheme.text.secondary,
+  textTertiary: LightTheme.text.tertiary,
+  textOnPrimary: LightTheme.text.inverse,
+
+  primary: Accent.DEFAULT,
+  success: Semantic.success,
+  successLight: Accent[50],
+
+  // Legacy structured support (used elsewhere)
+  base: LightTheme.background,
+
 } as const
 
 // Type definitions

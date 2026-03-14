@@ -44,12 +44,6 @@ export default function SimpleChatScreen() {
 
   const { newProjectId, newProjectName } = useLocalSearchParams<{ newProjectId: string; newProjectName: string }>()
 
-  // プロジェクト存在確認
-  useEffect(() => {
-    CraftdyAPI.hasProjects().then(() => {
-      // 現場がなくてもチャットは利用可能。結果はモーダル誘導の判断材料にのみ使う予定。
-    })
-  }, [])
 
   // 新規作成された現場の自動選択
   useEffect(() => {
