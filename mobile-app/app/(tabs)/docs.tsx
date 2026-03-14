@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
   actionButton: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    backgroundColor: Colors.primary.alpha[10],
+    backgroundColor: Colors.accent.alpha[10],
     borderRadius: BorderRadius.sm,
   },
   emptyState: {
