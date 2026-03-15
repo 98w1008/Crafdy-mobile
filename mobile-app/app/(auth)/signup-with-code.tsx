@@ -22,6 +22,9 @@ import {
   InvitationData 
 } from '@/lib/invitation-system'
 
+const theme = Colors.light
+const accent = Colors.accent
+
 export default function SignupWithCodeScreen() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -213,7 +216,7 @@ export default function SignupWithCodeScreen() {
                 placeholder="ABCD1234"
                 value={invitationCode}
                 onChangeText={setInvitationCode}
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor={theme.text.tertiary}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={8}
@@ -255,7 +258,7 @@ export default function SignupWithCodeScreen() {
               placeholder="山田太郎"
               value={fullName}
               onChangeText={setFullName}
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={theme.text.tertiary}
               autoCapitalize="words"
             />
           </View>
@@ -271,7 +274,7 @@ export default function SignupWithCodeScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={theme.text.tertiary}
             />
           </View>
 
@@ -284,7 +287,7 @@ export default function SignupWithCodeScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={theme.text.tertiary}
             />
           </View>
 
@@ -297,7 +300,7 @@ export default function SignupWithCodeScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={theme.text.tertiary}
             />
           </View>
 
@@ -383,7 +386,7 @@ export default function SignupWithCodeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.background.primary,
   },
   scrollView: {
     flex: 1,
@@ -401,26 +404,26 @@ const styles = StyleSheet.create({
   logo: {
     width: 80,
     height: 80,
-    backgroundColor: Colors.primary,
+    backgroundColor: accent.DEFAULT,
     borderRadius: BorderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   logoText: {
-    color: Colors.textOnPrimary,
+    color: theme.text.inverse,
     fontSize: Typography['4xl'],
     fontWeight: Typography.weights.bold,
   },
   title: {
     fontSize: Typography['3xl'],
     fontWeight: Typography.weights.bold,
-    color: Colors.text,
+    color: theme.text.primary,
     marginBottom: Spacing.xs,
   },
   subtitle: {
     fontSize: Typography.lg,
-    color: Colors.textSecondary,
+    color: theme.text.secondary,
     textAlign: 'center',
   },
   form: {
@@ -432,22 +435,22 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sm,
     fontWeight: Typography.weights.medium,
-    color: Colors.text,
+    color: theme.text.primary,
   },
   helpText: {
     fontSize: Typography.xs,
-    color: Colors.textSecondary,
+    color: theme.text.secondary,
     lineHeight: 16,
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: theme.background.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.border.medium,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     fontSize: Typography.base,
-    color: Colors.text,
+    color: theme.text.primary,
   },
   codeInputContainer: {
     flexDirection: 'row',
@@ -462,7 +465,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   validateButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: accent.DEFAULT,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
@@ -471,15 +474,15 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   validateButtonDisabled: {
-    backgroundColor: Colors.textTertiary,
+    backgroundColor: theme.text.tertiary,
   },
   validateButtonText: {
-    color: Colors.textOnPrimary,
+    color: theme.text.inverse,
     fontSize: Typography.sm,
     fontWeight: Typography.weights.semibold,
   },
   invitationInfo: {
-    backgroundColor: Colors.successLight,
+    backgroundColor: accent[50],
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginTop: Spacing.sm,
@@ -487,12 +490,12 @@ const styles = StyleSheet.create({
   invitationInfoTitle: {
     fontSize: Typography.sm,
     fontWeight: Typography.weights.semibold,
-    color: Colors.success,
+    color: accent.DEFAULT,
     marginBottom: Spacing.xs,
   },
   invitationInfoText: {
     fontSize: Typography.sm,
-    color: Colors.text,
+    color: theme.text.primary,
     marginBottom: Spacing.xs / 2,
   },
   agreementSection: {
@@ -508,44 +511,44 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: theme.border.medium,
     borderRadius: BorderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: theme.background.surface,
   },
   checkboxChecked: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: accent.DEFAULT,
+    borderColor: accent.DEFAULT,
   },
   checkmark: {
-    color: Colors.textOnPrimary,
+    color: theme.text.inverse,
     fontSize: 12,
     fontWeight: Typography.weights.bold,
   },
   checkboxText: {
     flex: 1,
     fontSize: Typography.sm,
-    color: Colors.text,
+    color: theme.text.primary,
     lineHeight: 20,
   },
   agreementLink: {
-    color: Colors.primary,
+    color: accent.DEFAULT,
     fontWeight: Typography.weights.medium,
     textDecorationLine: 'underline',
   },
   button: {
-    backgroundColor: Colors.primary,
+    backgroundColor: accent.DEFAULT,
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.md,
     alignItems: 'center',
     marginTop: Spacing.sm,
   },
   buttonDisabled: {
-    backgroundColor: Colors.textTertiary,
+    backgroundColor: theme.text.tertiary,
   },
   buttonText: {
-    color: Colors.textOnPrimary,
+    color: theme.text.inverse,
     fontSize: Typography.base,
     fontWeight: Typography.weights.semibold,
   },
@@ -557,19 +560,19 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: theme.border.light,
   },
   dividerText: {
     marginHorizontal: Spacing.md,
     fontSize: Typography.sm,
-    color: Colors.textSecondary,
+    color: theme.text.secondary,
   },
   linkButton: {
     alignItems: 'center',
     paddingVertical: Spacing.sm,
   },
   linkText: {
-    color: Colors.primary,
+    color: accent.DEFAULT,
     fontSize: Typography.base,
     fontWeight: Typography.weights.medium,
   },
