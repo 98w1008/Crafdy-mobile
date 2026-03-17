@@ -90,17 +90,33 @@ const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: strin
   }
 }
 
-const getIntentQuestionCount = (category: IntentCategory) => {
+const getIntentFields = (category: IntentCategory) => {
   switch (category) {
     case 'invoice':
-      return 4
+      return ['宛名', '請求対象', '金額', '支払期日']
     case 'estimate':
-      return 4
+      return ['工事/作業内容', '数量/単位', '希望納期', '現場住所']
     case 'daily_report':
-      return 4
+      return ['日付', '作業内容', '人数/作業時間', '明日の予定']
     case 'expense':
-      return 4
+      return ['領収書/写真', 'いつ/どこで/何', '金額', '支払方法']
   }
+}
+
+const getIntentQuestionCount = (category: IntentCategory) => {
+  return getIntentFields(category).length
+}
+
+const buildProgressSummary = (category: IntentCategory, step: number) => {
+  const fields = getIntentFields(category)
+
+  // NOTE: 最小実装。stepは「ここまで回答済み（とみなす）」として扱う。
+  const lines = fields.map((label, idx) => {
+    const status = idx < step ? '取得済み' : '未確認'
+    return `・${label}: ${status}`
+  })
+
+  return ['進捗:', ...lines].join('\n')
 }
 
 const buildFollowupAiReply = (
@@ -112,6 +128,8 @@ const buildFollowupAiReply = (
     ? `（現場: ${selectedProjectName}）`
     : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
 
+  const progress = buildProgressSummary(category, step)
+
   // NOTE: 最小実装。stepに応じて「次に聞くべきこと」を1つずつ進める。
   switch (category) {
     case 'invoice': {
@@ -121,7 +139,7 @@ const buildFollowupAiReply = (
         '金額はいくらですか？（内訳があれば内訳も）',
         '支払期日はいつですか？',
       ]
-      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'estimate': {
       const questions = [
@@ -130,7 +148,7 @@ const buildFollowupAiReply = (
         '希望納期は？（いつまで）',
         '現場住所は分かりますか？（分かる範囲でOK）',
       ]
-      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'daily_report': {
       const questions = [
@@ -139,7 +157,7 @@ const buildFollowupAiReply = (
         '人数/作業時間は？（分かる範囲でOK）',
         '明日の予定は？（あれば）',
       ]
-      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'expense': {
       const questions = [
@@ -148,7 +166,7 @@ const buildFollowupAiReply = (
         '金額（税込）は？',
         '支払方法は？（現金/カード/振込など）',
       ]
-      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
   }
 }
