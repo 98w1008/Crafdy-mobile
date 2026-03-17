@@ -12,38 +12,54 @@ import {
   Modal,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { CraftdyAPI } from '@/lib/api'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
-
-type QuickAction = 'select_project' | 'create_project'
 
 interface Message {
   id: string
   text: string
   sender: 'user' | 'ai'
   timestamp: Date
-  actions?: QuickAction[]
-  isInitial?: boolean // 初回メッセージ判定用
 }
 
 type SelectedProject = { id: string; name: string } | null
 
+type EmptyQuickAction = {
+  id: 'invoice' | 'estimate' | 'daily_report' | 'expense'
+  label: string
+  prompt: string
+}
+
 export default function SimpleChatScreen() {
   const router = useRouter()
-  const [messages, setMessages] = useState<Message[]>([{
-    id: 'init-ai',
-    text: '現場を選ぶか作成してください。',
-    sender: 'ai',
-    timestamp: new Date(),
-    actions: ['select_project', 'create_project'],
-    isInitial: true,
-  }])
+  const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [selectedProject, setSelectedProject] = useState<SelectedProject>(null) // TODO: AsyncStorage/Contextと連携
   const [showProjectSelector, setShowProjectSelector] = useState(false)
 
   const { newProjectId, newProjectName } = useLocalSearchParams<{ newProjectId: string; newProjectName: string }>()
 
+  const emptyQuickActions: EmptyQuickAction[] = [
+    {
+      id: 'invoice',
+      label: '請求書',
+      prompt: '請求書を作りたいです。必要な情報を聞いてください。',
+    },
+    {
+      id: 'estimate',
+      label: '見積',
+      prompt: '見積を作りたいです。必要な情報を聞いてください。',
+    },
+    {
+      id: 'daily_report',
+      label: '日報',
+      prompt: '日報を作りたいです。今日の作業内容を整理したいです。',
+    },
+    {
+      id: 'expense',
+      label: '経費',
+      prompt: '経費（材料費/外注費含む）を整理したいです。まず何を出せばいいですか？',
+    },
+  ]
 
   // 新規作成された現場の自動選択
   useEffect(() => {
@@ -53,7 +69,7 @@ export default function SimpleChatScreen() {
       // AIからの歓迎メッセージを追加
       const welcomeMessage: Message = {
         id: `welcome-${Date.now()}`,
-        text: `[${newProjectName}] を作成しました。この現場の状況や作業内容をメモしてください。`,
+        text: `[${newProjectName}] を作成しました。続けて依頼を書いてください（例：日報/見積/請求書）。`,
         sender: 'ai',
         timestamp: new Date(),
       }
@@ -95,13 +111,11 @@ export default function SimpleChatScreen() {
     if (!selectedProject) {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'まずは現場を選ぶか作成してください。どちらにしますか？',
+        text: '了解。現場は未選択のままでも進められます。必要なら右上の「現場」から選択/作成できます。\n\nまずは目的を教えてください（例：請求書/見積/日報/経費整理）。',
         sender: 'ai',
         timestamp: new Date(),
-        actions: ['select_project', 'create_project'],
       }
       setMessages(prev => [...prev, aiMessage])
-      setShowProjectSelector(true)
       return
     }
 
@@ -118,15 +132,14 @@ export default function SimpleChatScreen() {
   }
 
   const canSend = !!inputText.trim()
+  const isEmpty = messages.length === 0
 
-  const handleQuickAction = (action: QuickAction) => {
-    if (action === 'select_project') {
-      setShowProjectSelector(true)
-      return
-    }
-    if (action === 'create_project') {
-      router.push('/project-create')
-    }
+  const handleProjectButton = () => {
+    setShowProjectSelector(true)
+  }
+
+  const handleEmptyQuickAction = (action: EmptyQuickAction) => {
+    setInputText(action.prompt)
   }
 
   return (
@@ -136,17 +149,40 @@ export default function SimpleChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-
+        {/* ヘッダー（チャット主役 / 現場は補助） */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Crafdy</Text>
+            <Text style={styles.headerSubtitle}>
+              現場: {selectedProject ? selectedProject.name : '未選択'}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.headerProjectButton} onPress={handleProjectButton}>
+            <Text style={styles.headerProjectButtonText}>現場</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* メッセージ一覧 */}
         <ScrollView style={styles.messagesContainer} contentContainerStyle={styles.messagesContent}>
-          {messages.length === 0 ? (
+          {isEmpty ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>メモを入力してください</Text>
+              <Text style={styles.emptyStateText}>今日は何を作りますか？</Text>
               <Text style={styles.emptyStateSubtext}>
-                現場の状況や作業内容を自由に書いてください。{'\n'}
-                AIが内容を整理し、見積・請求作成をサポートします。
+                請求書・見積・日報を、チャットで作れます。{'\n'}
+                材料費や経費の整理もOK。現場は後から選択できます。
               </Text>
+
+              <View style={styles.emptyQuickActionsRow}>
+                {emptyQuickActions.map(action => (
+                  <TouchableOpacity
+                    key={action.id}
+                    style={styles.emptyQuickActionChip}
+                    onPress={() => handleEmptyQuickAction(action)}
+                  >
+                    <Text style={styles.emptyQuickActionChipText}>{action.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           ) : (
             messages.map(message => (
@@ -155,42 +191,9 @@ export default function SimpleChatScreen() {
                 style={[
                   styles.messageBubble,
                   message.sender === 'user' ? styles.userBubble : styles.aiBubble,
-                  message.isInitial && styles.initialAiBubble,
                 ]}
               >
-                {message.isInitial ? (
-                  // 初回メッセージのリッチ表示
-                  <View>
-                    <Text style={styles.cardTitle}>現場を選択してください</Text>
-                    <Text style={styles.cardBody}>
-                      現場の状況や作業内容を記録するには、まず対象の現場を選んでください。
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.messageText}>{message.text}</Text>
-                )}
-
-                {message.actions ? (
-                  <View style={styles.actionChipsRow}>
-                    {message.actions.map(action => (
-                      <TouchableOpacity
-                        key={`${message.id}-${action}`}
-                        style={[
-                          styles.actionChip,
-                          action === 'create_project' ? styles.actionChipPrimary : styles.actionChipSecondary
-                        ]}
-                        onPress={() => handleQuickAction(action)}
-                      >
-                        <Text style={[
-                          styles.actionChipText,
-                          action === 'create_project' ? styles.actionChipTextPrimary : styles.actionChipTextSecondary
-                        ]}>
-                          {action === 'select_project' ? '現場を選ぶ' : '＋ 現場を作成'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : null}
+                <Text style={styles.messageText}>{message.text}</Text>
                 <Text style={styles.messageTime}>
                   {message.timestamp.toLocaleTimeString('ja-JP', {
                     hour: '2-digit',
@@ -208,7 +211,11 @@ export default function SimpleChatScreen() {
             style={styles.input}
             value={inputText}
             onChangeText={setInputText}
-            placeholder={selectedProject ? "メモを入力..." : "現場未選択のまま送信するとAIが誘導します"}
+            placeholder={
+              selectedProject
+                ? '例）この現場の見積を作って。写真も貼れます'
+                : '例）○○邸の請求書作って。現場はあとで選べます'
+            }
             placeholderTextColor={Colors.dark.text.tertiary}
             multiline
             maxLength={1000}
@@ -299,6 +306,45 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     textAlign: 'center',
   },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border.light,
+    backgroundColor: Colors.dark.background.primary,
+  },
+  headerLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  headerTitle: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+  },
+  headerSubtitle: {
+    color: Colors.dark.text.tertiary,
+    fontSize: Typography.sizes.xs,
+  },
+  headerProjectButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+    backgroundColor: Colors.dark.background.surface,
+  },
+  headerProjectButtonText: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+
   messagesContainer: {
     flex: 1,
   },
@@ -325,6 +371,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: Spacing.lg,
+  },
+  emptyQuickActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  emptyQuickActionChip: {
+    backgroundColor: Colors.dark.background.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  emptyQuickActionChipText: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
   messageBubble: {
     maxWidth: '88%',
