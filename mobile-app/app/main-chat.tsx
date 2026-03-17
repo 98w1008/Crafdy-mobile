@@ -29,6 +29,65 @@ type EmptyQuickAction = {
   prompt: string
 }
 
+type IntentCategory = 'invoice' | 'estimate' | 'daily_report' | 'expense'
+
+const classifyIntentCategory = (text: string): IntentCategory | null => {
+  const t = text.toLowerCase()
+
+  // NOTE: 最小実装（キーワードベース）
+  const hasAny = (keywords: string[]) => keywords.some(k => t.includes(k))
+
+  if (hasAny(['請求', '請求書', 'インボイス', 'invoice'])) return 'invoice'
+  if (hasAny(['見積', '見積もり', '見積り', '見積書', 'estimate'])) return 'estimate'
+  if (hasAny(['日報', '作業報告', '報告書', 'daily report'])) return 'daily_report'
+  if (hasAny(['経費', '領収書', 'レシート', '材料費', '外注費', 'expense'])) return 'expense'
+
+  return null
+}
+
+const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: string) => {
+  const projectNote = selectedProjectName ? `（現場: ${selectedProjectName}）` : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
+
+  switch (category) {
+    case 'invoice':
+      return [
+        'OK。請求書を作ります。まず次を教えてください。',
+        '・宛名（取引先名）',
+        '・請求対象（工事名 / 対象期間）',
+        '・金額（内訳があれば内訳も）',
+        '・支払期日',
+        projectNote,
+      ].join('\n')
+    case 'estimate':
+      return [
+        'OK。見積を作ります。まず次を教えてください。',
+        '・工事/作業内容（何をするか）',
+        '・数量/単位（ざっくりでもOK）',
+        '・希望納期（いつまで）',
+        '・現場住所（分かる範囲で）',
+        projectNote,
+      ].join('\n')
+    case 'daily_report':
+      return [
+        'OK。日報をまとめます。まず次を教えてください。',
+        '・今日の日付（または「今日」でOK）',
+        '・作業内容（箇条書きでOK）',
+        '・人数/作業時間（分かる範囲で）',
+        '・明日の予定（あれば）',
+        projectNote,
+      ].join('\n')
+    case 'expense':
+      return [
+        'OK。経費を整理します。まず次を教えてください。',
+        '・領収書/写真はありますか？（あれば添付）',
+        '・いつ/どこで/何を買った（支払った）か',
+        '・金額（税込）',
+        '・支払方法（現金/カード/振込など）',
+        projectNote,
+      ].join('\n')
+  }
+}
+
 export default function SimpleChatScreen() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
@@ -95,12 +154,15 @@ export default function SimpleChatScreen() {
   }
 
   const handleSend = () => {
-    if (!inputText.trim()) return
+    const trimmed = inputText.trim()
+    if (!trimmed) return
+
+    const isFirstUserMessage = messages.every(m => m.sender !== 'user')
 
     // ユーザーメッセージを追加
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim(),
+      text: trimmed,
       sender: 'user',
       timestamp: new Date(),
     }
@@ -108,10 +170,23 @@ export default function SimpleChatScreen() {
     setMessages(prev => [...prev, userMessage])
     setInputText('')
 
-    if (!selectedProject) {
+    // 初回依頼（＋現場未選択）で、目的が言えているなら一段深く聞く
+    if (!selectedProject && isFirstUserMessage) {
+      const category = classifyIntentCategory(trimmed)
+      if (category) {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: buildFirstAiReply(category),
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: '了解。現場は未選択のままでも進められます。必要なら右上の「現場」から選択/作成できます。\n\nまずは目的を教えてください（例：請求書/見積/日報/経費整理）。',
+        text: '了解。現場は未選択のままでも進められます（必要なら右上の「現場」から選択/作成できます）。\n\nまずは何を作りたいですか？（例：請求書/見積/日報/経費整理）',
         sender: 'ai',
         timestamp: new Date(),
       }
