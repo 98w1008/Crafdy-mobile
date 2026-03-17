@@ -137,6 +137,7 @@ export default function SignupScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Logo Section */}
         <View style={styles.logoSection}>
