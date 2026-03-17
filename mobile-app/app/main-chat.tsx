@@ -46,7 +46,9 @@ const classifyIntentCategory = (text: string): IntentCategory | null => {
 }
 
 const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: string) => {
-  const projectNote = selectedProjectName ? `（現場: ${selectedProjectName}）` : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
+  const projectNote = selectedProjectName
+    ? `（現場: ${selectedProjectName}）`
+    : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
 
   switch (category) {
     case 'invoice':
@@ -88,12 +90,78 @@ const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: strin
   }
 }
 
+const getIntentQuestionCount = (category: IntentCategory) => {
+  switch (category) {
+    case 'invoice':
+      return 4
+    case 'estimate':
+      return 4
+    case 'daily_report':
+      return 4
+    case 'expense':
+      return 4
+  }
+}
+
+const buildFollowupAiReply = (
+  category: IntentCategory,
+  step: number,
+  selectedProjectName?: string
+) => {
+  const projectNote = selectedProjectName
+    ? `（現場: ${selectedProjectName}）`
+    : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
+
+  // NOTE: 最小実装。stepに応じて「次に聞くべきこと」を1つずつ進める。
+  switch (category) {
+    case 'invoice': {
+      const questions = [
+        '宛名（取引先名）は？',
+        '請求対象（工事名 / 対象期間）は？',
+        '金額はいくらですか？（内訳があれば内訳も）',
+        '支払期日はいつですか？',
+      ]
+      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+    }
+    case 'estimate': {
+      const questions = [
+        '工事/作業内容は？（何をするか）',
+        '数量/単位は？（ざっくりでもOK）',
+        '希望納期は？（いつまで）',
+        '現場住所は分かりますか？（分かる範囲でOK）',
+      ]
+      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+    }
+    case 'daily_report': {
+      const questions = [
+        '日付は？（「今日」でもOK）',
+        '作業内容を箇条書きで教えてください。',
+        '人数/作業時間は？（分かる範囲でOK）',
+        '明日の予定は？（あれば）',
+      ]
+      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+    }
+    case 'expense': {
+      const questions = [
+        '領収書/写真はありますか？（あれば添付してください）',
+        'いつ/どこで/何を買った（支払った）か教えてください。',
+        '金額（税込）は？',
+        '支払方法は？（現金/カード/振込など）',
+      ]
+      return `${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+    }
+  }
+}
+
 export default function SimpleChatScreen() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [selectedProject, setSelectedProject] = useState<SelectedProject>(null) // TODO: AsyncStorage/Contextと連携
   const [showProjectSelector, setShowProjectSelector] = useState(false)
+
+  const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
+  const [intentStep, setIntentStep] = useState(0)
 
   const { newProjectId, newProjectName } = useLocalSearchParams<{ newProjectId: string; newProjectName: string }>()
 
@@ -170,10 +238,13 @@ export default function SimpleChatScreen() {
     setMessages(prev => [...prev, userMessage])
     setInputText('')
 
-    // 初回依頼（＋現場未選択）で、目的が言えているなら一段深く聞く
+    // 初回依頼（＋現場未選択）で、目的が言えているなら intent を保持して一段深く聞く
     if (!selectedProject && isFirstUserMessage) {
       const category = classifyIntentCategory(trimmed)
       if (category) {
+        setCurrentIntent(category)
+        setIntentStep(0)
+
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           text: buildFirstAiReply(category),
@@ -190,6 +261,27 @@ export default function SimpleChatScreen() {
         sender: 'ai',
         timestamp: new Date(),
       }
+      setMessages(prev => [...prev, aiMessage])
+      return
+    }
+
+    // intent がある場合、2通目以降は intent 前提で次に必要な情報を聞く
+    if (currentIntent) {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: buildFollowupAiReply(currentIntent, intentStep, selectedProject?.name),
+        sender: 'ai',
+        timestamp: new Date(),
+      }
+
+      const isLastQuestion = intentStep >= getIntentQuestionCount(currentIntent) - 1
+      if (isLastQuestion) {
+        setCurrentIntent(null)
+        setIntentStep(0)
+      } else {
+        setIntentStep(prev => prev + 1)
+      }
+
       setMessages(prev => [...prev, aiMessage])
       return
     }
