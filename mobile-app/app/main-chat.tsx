@@ -31,6 +31,13 @@ type EmptyQuickAction = {
 
 type IntentCategory = 'invoice' | 'estimate' | 'daily_report' | 'expense'
 
+type ExpenseCollected = {
+  receiptConfirmed: boolean
+  whenWhereWhatConfirmed: boolean
+  amountConfirmed: boolean
+  paymentMethodConfirmed: boolean
+}
+
 const classifyIntentCategory = (text: string): IntentCategory | null => {
   const t = text.toLowerCase()
 
@@ -44,6 +51,47 @@ const classifyIntentCategory = (text: string): IntentCategory | null => {
 
   return null
 }
+
+const defaultExpenseCollected: ExpenseCollected = {
+  receiptConfirmed: false,
+  whenWhereWhatConfirmed: false,
+  amountConfirmed: false,
+  paymentMethodConfirmed: false,
+}
+
+const extractExpenseCollected = (text: string, prev: ExpenseCollected): ExpenseCollected => {
+  const t = text.toLowerCase()
+
+  const next: ExpenseCollected = { ...prev }
+
+  // 領収書/写真: 「ある/ない」どちらでも、言及があれば確認済みにする
+  if (
+    /(領収|領収書|レシート|レシ|写真|画像|添付)/.test(t) &&
+    /(ある|あり|ない|なし|無し|無い)/.test(t)
+  ) {
+    next.receiptConfirmed = true
+  }
+
+  // 金額（円/¥/数字）
+  if (/(¥|円)/.test(t) && /\d/.test(t)) {
+    next.amountConfirmed = true
+  }
+
+  // 支払方法
+  if (/(現金|カード|クレカ|振込|銀行|paypay|ペイペイ)/.test(t)) {
+    next.paymentMethodConfirmed = true
+  }
+
+  // いつ/どこで/何（雑でも、購入/支払い内容の記述があればOK扱い）
+  if (/(で|にて|@|＠|購入|買|支払|払|店|コンビニ|ホームセンター)/.test(t) && t.length >= 6) {
+    next.whenWhereWhatConfirmed = true
+  }
+
+  return next
+}
+
+const isExpenseComplete = (c: ExpenseCollected) =>
+  c.receiptConfirmed && c.whenWhereWhatConfirmed && c.amountConfirmed && c.paymentMethodConfirmed
 
 const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: string) => {
   const projectNote = selectedProjectName
@@ -107,12 +155,31 @@ const getIntentQuestionCount = (category: IntentCategory) => {
   return getIntentFields(category).length
 }
 
-const buildProgressSummary = (category: IntentCategory, step: number) => {
+const buildProgressSummary = (
+  category: IntentCategory,
+  step: number,
+  expenseCollected?: ExpenseCollected
+) => {
   const fields = getIntentFields(category)
 
-  // NOTE: 最小実装。stepは「ここまで回答済み（とみなす）」として扱う。
+  // NOTE: 最小実装。
+  // - 既存カテゴリは step を「ここまで回答済み（とみなす）」
+  // - expense は抽出結果（expenseCollected）を優先
   const lines = fields.map((label, idx) => {
-    const status = idx < step ? '取得済み' : '未確認'
+    let status: '取得済み' | '未確認'
+
+    if (category === 'expense' && expenseCollected) {
+      const flags = [
+        expenseCollected.receiptConfirmed,
+        expenseCollected.whenWhereWhatConfirmed,
+        expenseCollected.amountConfirmed,
+        expenseCollected.paymentMethodConfirmed,
+      ]
+      status = flags[idx] ? '取得済み' : '未確認'
+    } else {
+      status = idx < step ? '取得済み' : '未確認'
+    }
+
     return `・${label}: ${status}`
   })
 
@@ -122,13 +189,14 @@ const buildProgressSummary = (category: IntentCategory, step: number) => {
 const buildFollowupAiReply = (
   category: IntentCategory,
   step: number,
-  selectedProjectName?: string
+  selectedProjectName?: string,
+  expenseCollected?: ExpenseCollected
 ) => {
   const projectNote = selectedProjectName
     ? `（現場: ${selectedProjectName}）`
     : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
 
-  const progress = buildProgressSummary(category, step)
+  const progress = buildProgressSummary(category, step, expenseCollected)
 
   // NOTE: 最小実装。stepに応じて「次に聞くべきこと」を1つずつ進める。
   switch (category) {
@@ -180,6 +248,7 @@ export default function SimpleChatScreen() {
 
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
+  const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
 
   const { newProjectId, newProjectName } = useLocalSearchParams<{ newProjectId: string; newProjectName: string }>()
 
@@ -262,6 +331,7 @@ export default function SimpleChatScreen() {
       if (category) {
         setCurrentIntent(category)
         setIntentStep(0)
+        setExpenseCollected(defaultExpenseCollected)
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -285,6 +355,43 @@ export default function SimpleChatScreen() {
 
     // intent がある場合、2通目以降は intent 前提で次に必要な情報を聞く
     if (currentIntent) {
+      if (currentIntent === 'expense') {
+        const nextCollected = extractExpenseCollected(trimmed, expenseCollected)
+        setExpenseCollected(nextCollected)
+
+        // 次に聞くべき「未確認」項目を探す（未確認が無ければ完了）
+        const flags = [
+          nextCollected.receiptConfirmed,
+          nextCollected.whenWhereWhatConfirmed,
+          nextCollected.amountConfirmed,
+          nextCollected.paymentMethodConfirmed,
+        ]
+        const nextIndex = flags.findIndex(v => !v)
+
+        if (nextIndex === -1) {
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `${buildProgressSummary('expense', 0, nextCollected)}\n\nOK。必要な情報が揃いました。次は「用途（経費区分）」や「対象期間」も必要なら聞きます。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          setCurrentIntent(null)
+          setIntentStep(0)
+          setExpenseCollected(defaultExpenseCollected)
+          return
+        }
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: buildFollowupAiReply('expense', nextIndex, selectedProject?.name, nextCollected),
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: buildFollowupAiReply(currentIntent, intentStep, selectedProject?.name),
