@@ -53,6 +53,14 @@ type EstimatePhase2Collected = {
   marginConfirmed: boolean
 }
 
+type EstimateOverrides = {
+  client?: string
+  pricingPolicy?: string
+  margin?: string
+  dueDate?: string
+  quantityUnit?: string
+}
+
 type DailyReportCollected = {
   dateConfirmed: boolean
   workConfirmed: boolean
@@ -100,6 +108,8 @@ const defaultEstimatePhase2Collected: EstimatePhase2Collected = {
   pricingPolicyConfirmed: false,
   marginConfirmed: false,
 }
+
+const defaultEstimateOverrides: EstimateOverrides = {}
 
 const defaultDailyReportCollected: DailyReportCollected = {
   dateConfirmed: false,
@@ -240,6 +250,7 @@ const isEstimatePhase2Complete = (c: EstimatePhase2Collected) =>
 const buildEstimateFinalSummary = (params: {
   phase1: EstimateCollected
   phase2: EstimatePhase2Collected
+  overrides?: EstimateOverrides
   selectedProjectName?: string
 }) => {
   const projectLine = params.selectedProjectName
@@ -261,20 +272,91 @@ const buildEstimateFinalSummary = (params: {
     params.phase2.marginConfirmed,
   ]
 
-  const toLine = (label: string, ok: boolean) => `・${label}: ${ok ? '取得済み' : '未確認'}`
+  const suffixFor = (key: keyof EstimateOverrides) => {
+    const v = params.overrides?.[key]
+    if (!v) return ''
+    return `（修正: ${v}）`
+  }
+
+  const toLine = (label: string, ok: boolean, suffix = '') =>
+    `・${label}: ${ok ? '取得済み' : '未確認'}${suffix}`
 
   return [
     '最終確認（見積）',
     projectLine,
     '',
     '【見積の土台】',
-    ...phase1Labels.map((l, i) => toLine(l, !!phase1Flags[i])),
+    ...phase1Labels.map((l, i) => {
+      if (l === '数量/単位') return toLine(l, !!phase1Flags[i], suffixFor('quantityUnit'))
+      if (l === '希望納期') return toLine(l, !!phase1Flags[i], suffixFor('dueDate'))
+      return toLine(l, !!phase1Flags[i])
+    }),
     '',
     '【価格の前提】',
-    ...phase2Labels.map((l, i) => toLine(l, !!phase2Flags[i])),
+    ...phase2Labels.map((l, i) => {
+      if (l === '元請け/顧客名') return toLine(l, !!phase2Flags[i], suffixFor('client'))
+      if (l === '価格方針') return toLine(l, !!phase2Flags[i], suffixFor('pricingPolicy'))
+      if (l === '希望粗利率') return toLine(l, !!phase2Flags[i], suffixFor('margin'))
+      return toLine(l, !!phase2Flags[i])
+    }),
     '',
     '修正があれば、項目名を指定してチャットで指示してください（例：「希望納期を来週金曜に」）。',
   ].join('\n')
+}
+
+const getLastAiText = (messages: Message[]) => {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].sender === 'ai') return messages[i].text
+  }
+  return null
+}
+
+const parseEstimateEditInstruction = (text: string) => {
+  const t = text.toLowerCase()
+
+  const edits: EstimateOverrides = {}
+
+  // 元請け/顧客名
+  if (/(元請け|顧客|宛名)/.test(t) || /(御中|株式会社|有限会社|合同会社)/.test(text)) {
+    const m = text.match(/(?:元請け|顧客|宛名)[:：\s]*([^\n]+)/)
+    edits.client = (m?.[1] || text).trim()
+  }
+
+  // 価格方針
+  if (/(価格方針|攻め|標準|慎重|強気|安全|固め)/.test(t)) {
+    if (/(攻め|強気)/.test(t)) edits.pricingPolicy = '攻め'
+    else if (/(慎重|安全|固め)/.test(t)) edits.pricingPolicy = '慎重'
+    else if (/(標準)/.test(t)) edits.pricingPolicy = '標準'
+    else {
+      const m = text.match(/価格方針[:：\s]*([^\n]+)/)
+      edits.pricingPolicy = (m?.[1] || '').trim() || '標準'
+    }
+  }
+
+  // 希望粗利率
+  if (/(粗利|%|パーセント)/.test(t)) {
+    const m = text.match(/(\d{1,2}(?:\.\d+)?)\s*(%|パーセント)/)
+    if (m?.[1]) edits.margin = `${m[1]}%`
+    else {
+      const n = text.match(/\d{1,2}(?:\.\d+)?/)
+      if (n?.[0]) edits.margin = `${n[0]}%`
+    }
+  }
+
+  // 希望納期
+  if (/(納期|いつまで|来週|今週|月末|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/.test(t)) {
+    const m = text.match(/(?:希望納期|納期|いつまで)[:：\s]*([^\n]+)/)
+    edits.dueDate = (m?.[1] || text).trim()
+  }
+
+  // 数量/単位
+  if (/(数量|単位|台|個|㎡|m2|m|式|箇所|本|枚)/.test(t)) {
+    const m = text.match(/(?:数量|単位)[:：\s]*([^\n]+)/)
+    const d = text.match(/\d+\s*(個|台|m2|㎡|m|式|箇所|本|枚)/)
+    edits.quantityUnit = (m?.[1] || d?.[0] || text).trim()
+  }
+
+  return edits
 }
 
 const extractInvoiceCollected = (text: string, prev: InvoiceCollected): InvoiceCollected => {
@@ -509,6 +591,7 @@ export default function SimpleChatScreen() {
   const [estimatePhase2Collected, setEstimatePhase2Collected] = useState<EstimatePhase2Collected>(
     defaultEstimatePhase2Collected
   )
+  const [estimateOverrides, setEstimateOverrides] = useState<EstimateOverrides>(defaultEstimateOverrides)
   const [dailyReportCollected, setDailyReportCollected] = useState<DailyReportCollected>(defaultDailyReportCollected)
   const [invoiceCollected, setInvoiceCollected] = useState<InvoiceCollected>(defaultInvoiceCollected)
 
@@ -576,6 +659,8 @@ export default function SimpleChatScreen() {
 
     const isFirstUserMessage = messages.every(m => m.sender !== 'user')
 
+    const lastAiText = getLastAiText(messages)
+
     // ユーザーメッセージを追加
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -587,6 +672,49 @@ export default function SimpleChatScreen() {
     setMessages(prev => [...prev, userMessage])
     setInputText('')
 
+    // 見積の最終確認サマリ後の「項目名指定の修正指示」(最小実装)
+    if (!currentIntent && lastAiText?.startsWith('最終確認（見積）')) {
+      const edits = parseEstimateEditInstruction(trimmed)
+      const keys = Object.keys(edits) as (keyof EstimateOverrides)[]
+      const hasEdits = keys.some(k => !!edits[k])
+
+      if (hasEdits) {
+        const nextOverrides: EstimateOverrides = { ...estimateOverrides, ...edits }
+        setEstimateOverrides(nextOverrides)
+
+        if (edits.dueDate) setEstimateCollected(prev => ({ ...prev, dueDateConfirmed: true }))
+        if (edits.quantityUnit) setEstimateCollected(prev => ({ ...prev, quantityUnitConfirmed: true }))
+        if (edits.client) setEstimatePhase2Collected(prev => ({ ...prev, clientConfirmed: true }))
+        if (edits.pricingPolicy) setEstimatePhase2Collected(prev => ({ ...prev, pricingPolicyConfirmed: true }))
+        if (edits.margin) setEstimatePhase2Collected(prev => ({ ...prev, marginConfirmed: true }))
+
+        const updated = keys
+          .filter(k => !!edits[k])
+          .map(k => {
+            if (k === 'client') return '元請け/顧客名'
+            if (k === 'pricingPolicy') return '価格方針'
+            if (k === 'margin') return '希望粗利率'
+            if (k === 'dueDate') return '希望納期'
+            if (k === 'quantityUnit') return '数量/単位'
+            return k
+          })
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `了解。以下を反映しました：${updated.join(' / ')}\n\n${buildEstimateFinalSummary({
+            phase1: estimateCollected,
+            phase2: estimatePhase2Collected,
+            overrides: nextOverrides,
+            selectedProjectName: selectedProject?.name,
+          })}`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+    }
+
     // 初回依頼（＋現場未選択）で、目的が言えているなら intent を保持して一段深く聞く
     if (!selectedProject && isFirstUserMessage) {
       const category = classifyIntentCategory(trimmed)
@@ -597,6 +725,7 @@ export default function SimpleChatScreen() {
         setEstimateCollected(defaultEstimateCollected)
         setEstimatePhase(1)
         setEstimatePhase2Collected(defaultEstimatePhase2Collected)
+        setEstimateOverrides(defaultEstimateOverrides)
         setDailyReportCollected(defaultDailyReportCollected)
         setInvoiceCollected(defaultInvoiceCollected)
 
@@ -760,6 +889,7 @@ export default function SimpleChatScreen() {
             // Phase 2へ移行（intentは維持）
             setEstimatePhase(2)
             setEstimatePhase2Collected(defaultEstimatePhase2Collected)
+            setEstimateOverrides(defaultEstimateOverrides)
             return
           }
 
@@ -790,6 +920,7 @@ export default function SimpleChatScreen() {
             text: buildEstimateFinalSummary({
               phase1: estimateCollected,
               phase2: nextCollected,
+              overrides: estimateOverrides,
               selectedProjectName: selectedProject?.name,
             }),
             sender: 'ai',
@@ -799,9 +930,8 @@ export default function SimpleChatScreen() {
 
           setCurrentIntent(null)
           setIntentStep(0)
-          setEstimateCollected(defaultEstimateCollected)
+          // NOTE: 最終確認サマリ後の修正指示に使うため、見積の収集状態は保持する
           setEstimatePhase(1)
-          setEstimatePhase2Collected(defaultEstimatePhase2Collected)
           return
         }
 
