@@ -52,6 +52,13 @@ type DailyReportCollected = {
   nextPlanConfirmed: boolean
 }
 
+type InvoiceCollected = {
+  clientConfirmed: boolean
+  billingTargetConfirmed: boolean
+  amountConfirmed: boolean
+  dueDateConfirmed: boolean
+}
+
 const classifyIntentCategory = (text: string): IntentCategory | null => {
   const t = text.toLowerCase()
 
@@ -85,6 +92,13 @@ const defaultDailyReportCollected: DailyReportCollected = {
   workConfirmed: false,
   workforceTimeConfirmed: false,
   nextPlanConfirmed: false,
+}
+
+const defaultInvoiceCollected: InvoiceCollected = {
+  clientConfirmed: false,
+  billingTargetConfirmed: false,
+  amountConfirmed: false,
+  dueDateConfirmed: false,
 }
 
 const extractExpenseCollected = (text: string, prev: ExpenseCollected): ExpenseCollected => {
@@ -180,8 +194,39 @@ const extractDailyReportCollected = (text: string, prev: DailyReportCollected): 
 const isEstimateComplete = (c: EstimateCollected) =>
   c.workConfirmed && c.quantityUnitConfirmed && c.dueDateConfirmed && c.locationConfirmed
 
+const extractInvoiceCollected = (text: string, prev: InvoiceCollected): InvoiceCollected => {
+  const t = text.toLowerCase()
+
+  const next: InvoiceCollected = { ...prev }
+
+  // 宛名（会社名っぽい/御中など）
+  if (/(御中|株式会社|有限会社|合同会社|\binc\b|\bco\.\b|\bltd\b)/i.test(text) || /(会社|御中)/.test(t)) {
+    next.clientConfirmed = true
+  }
+
+  // 請求対象（工事名/期間/○月分など）
+  if (/(工事|案件|現場|対象|期間|\d{1,2}月分)/.test(t)) {
+    next.billingTargetConfirmed = true
+  }
+
+  // 金額（円/¥/数字）
+  if (/(¥|円)/.test(t) && /\d/.test(t)) {
+    next.amountConfirmed = true
+  }
+
+  // 支払期日
+  if (/(支払|期日|まで|月末|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/.test(t)) {
+    next.dueDateConfirmed = true
+  }
+
+  return next
+}
+
 const isDailyReportComplete = (c: DailyReportCollected) =>
   c.dateConfirmed && c.workConfirmed && c.workforceTimeConfirmed && c.nextPlanConfirmed
+
+const isInvoiceComplete = (c: InvoiceCollected) =>
+  c.clientConfirmed && c.billingTargetConfirmed && c.amountConfirmed && c.dueDateConfirmed
 
 const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: string) => {
   const projectNote = selectedProjectName
@@ -250,7 +295,8 @@ const buildProgressSummary = (
   step: number,
   expenseCollected?: ExpenseCollected,
   estimateCollected?: EstimateCollected,
-  dailyReportCollected?: DailyReportCollected
+  dailyReportCollected?: DailyReportCollected,
+  invoiceCollected?: InvoiceCollected
 ) => {
   const fields = getIntentFields(category)
 
@@ -284,6 +330,14 @@ const buildProgressSummary = (
         dailyReportCollected.nextPlanConfirmed,
       ]
       status = flags[idx] ? '取得済み' : '未確認'
+    } else if (category === 'invoice' && invoiceCollected) {
+      const flags = [
+        invoiceCollected.clientConfirmed,
+        invoiceCollected.billingTargetConfirmed,
+        invoiceCollected.amountConfirmed,
+        invoiceCollected.dueDateConfirmed,
+      ]
+      status = flags[idx] ? '取得済み' : '未確認'
     } else {
       status = idx < step ? '取得済み' : '未確認'
     }
@@ -300,13 +354,21 @@ const buildFollowupAiReply = (
   selectedProjectName?: string,
   expenseCollected?: ExpenseCollected,
   estimateCollected?: EstimateCollected,
-  dailyReportCollected?: DailyReportCollected
+  dailyReportCollected?: DailyReportCollected,
+  invoiceCollected?: InvoiceCollected
 ) => {
   const projectNote = selectedProjectName
     ? `（現場: ${selectedProjectName}）`
     : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
 
-  const progress = buildProgressSummary(category, step, expenseCollected, estimateCollected, dailyReportCollected)
+  const progress = buildProgressSummary(
+    category,
+    step,
+    expenseCollected,
+    estimateCollected,
+    dailyReportCollected,
+    invoiceCollected
+  )
 
   // NOTE: 最小実装。stepに応じて「次に聞くべきこと」を1つずつ進める。
   switch (category) {
@@ -361,6 +423,7 @@ export default function SimpleChatScreen() {
   const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
   const [estimateCollected, setEstimateCollected] = useState<EstimateCollected>(defaultEstimateCollected)
   const [dailyReportCollected, setDailyReportCollected] = useState<DailyReportCollected>(defaultDailyReportCollected)
+  const [invoiceCollected, setInvoiceCollected] = useState<InvoiceCollected>(defaultInvoiceCollected)
 
   const { newProjectId, newProjectName } = useLocalSearchParams<{ newProjectId: string; newProjectName: string }>()
 
@@ -446,6 +509,7 @@ export default function SimpleChatScreen() {
         setExpenseCollected(defaultExpenseCollected)
         setEstimateCollected(defaultEstimateCollected)
         setDailyReportCollected(defaultDailyReportCollected)
+        setInvoiceCollected(defaultInvoiceCollected)
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -485,7 +549,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('expense', 0, nextCollected, undefined, undefined)}\n\nOK。必要な情報が揃いました。次は「用途（経費区分）」や「対象期間」も必要なら聞きます。`,
+            text: `${buildProgressSummary('expense', 0, nextCollected, undefined, undefined, undefined)}\n\nOK。必要な情報が揃いました。次は「用途（経費区分）」や「対象期間」も必要なら聞きます。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -494,12 +558,49 @@ export default function SimpleChatScreen() {
           setIntentStep(0)
           setExpenseCollected(defaultExpenseCollected)
           setDailyReportCollected(defaultDailyReportCollected)
+          setInvoiceCollected(defaultInvoiceCollected)
           return
         }
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: buildFollowupAiReply('expense', nextIndex, selectedProject?.name, nextCollected, undefined, undefined),
+          text: buildFollowupAiReply('expense', nextIndex, selectedProject?.name, nextCollected, undefined, undefined, undefined),
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+
+      if (currentIntent === 'invoice') {
+        const nextCollected = extractInvoiceCollected(trimmed, invoiceCollected)
+        setInvoiceCollected(nextCollected)
+
+        const flags = [
+          nextCollected.clientConfirmed,
+          nextCollected.billingTargetConfirmed,
+          nextCollected.amountConfirmed,
+          nextCollected.dueDateConfirmed,
+        ]
+        const nextIndex = flags.findIndex(v => !v)
+
+        if (nextIndex === -1) {
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `${buildProgressSummary('invoice', 0, undefined, undefined, undefined, nextCollected)}\n\nOK。請求書のたたき台に必要な情報が揃いました。必要なら「振込先」「備考」「インボイス要件」も追記できます。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          setCurrentIntent(null)
+          setIntentStep(0)
+          setInvoiceCollected(defaultInvoiceCollected)
+          return
+        }
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: buildFollowupAiReply('invoice', nextIndex, selectedProject?.name, undefined, undefined, undefined, nextCollected),
           sender: 'ai',
           timestamp: new Date(),
         }
@@ -522,7 +623,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('daily_report', 0, undefined, undefined, nextCollected)}\n\nOK。日報に必要な情報が揃いました。必要なら「写真」や「気づき/ヒヤリ」も追記できます。`,
+            text: `${buildProgressSummary('daily_report', 0, undefined, undefined, nextCollected, undefined)}\n\nOK。日報に必要な情報が揃いました。必要なら「写真」や「気づき/ヒヤリ」も追記できます。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -530,12 +631,13 @@ export default function SimpleChatScreen() {
           setCurrentIntent(null)
           setIntentStep(0)
           setDailyReportCollected(defaultDailyReportCollected)
+          setInvoiceCollected(defaultInvoiceCollected)
           return
         }
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: buildFollowupAiReply('daily_report', nextIndex, selectedProject?.name, undefined, undefined, nextCollected),
+          text: buildFollowupAiReply('daily_report', nextIndex, selectedProject?.name, undefined, undefined, nextCollected, undefined),
           sender: 'ai',
           timestamp: new Date(),
         }
@@ -558,7 +660,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined)}\n\nOK。見積の土台が揃いました。次に、以下3点を教えてください。\n・元請け/顧客名（誰に出す見積ですか？）\n・価格方針（攻め / 標準 / 慎重）\n・希望粗利率（%）`,
+            text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined, undefined)}\n\nOK。見積の土台が揃いました。次に、以下3点を教えてください。\n・元請け/顧客名（誰に出す見積ですか？）\n・価格方針（攻め / 標準 / 慎重）\n・希望粗利率（%）`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -567,12 +669,13 @@ export default function SimpleChatScreen() {
           setIntentStep(0)
           setEstimateCollected(defaultEstimateCollected)
           setDailyReportCollected(defaultDailyReportCollected)
+          setInvoiceCollected(defaultInvoiceCollected)
           return
         }
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: buildFollowupAiReply('estimate', nextIndex, selectedProject?.name, undefined, nextCollected, undefined),
+          text: buildFollowupAiReply('estimate', nextIndex, selectedProject?.name, undefined, nextCollected, undefined, undefined),
           sender: 'ai',
           timestamp: new Date(),
         }
@@ -582,7 +685,7 @@ export default function SimpleChatScreen() {
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: buildFollowupAiReply(currentIntent, intentStep, selectedProject?.name, undefined, undefined, undefined),
+        text: buildFollowupAiReply(currentIntent, intentStep, selectedProject?.name, undefined, undefined, undefined, undefined),
         sender: 'ai',
         timestamp: new Date(),
       }
