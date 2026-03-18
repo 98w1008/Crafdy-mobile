@@ -60,6 +60,12 @@ type EstimatePhase2Collected = {
   marginConfirmed: boolean
 }
 
+type EstimatePhase2Values = {
+  client?: string
+  pricingPolicy?: string
+  margin?: string
+}
+
 type EstimateOverrides = {
   client?: string
   pricingPolicy?: string
@@ -117,6 +123,8 @@ const defaultEstimatePhase2Collected: EstimatePhase2Collected = {
   pricingPolicyConfirmed: false,
   marginConfirmed: false,
 }
+
+const defaultEstimatePhase2Values: EstimatePhase2Values = {}
 
 const defaultEstimateOverrides: EstimateOverrides = {}
 
@@ -248,6 +256,40 @@ const extractEstimatePhase2Collected = (
   return next
 }
 
+const extractEstimatePhase2Values = (text: string, prev: EstimatePhase2Values): EstimatePhase2Values => {
+  const t = text.toLowerCase()
+  const next: EstimatePhase2Values = { ...prev }
+
+  // client（会社名っぽい語があれば全体 or ラベル後を拾う）
+  if (/(御中|株式会社|有限会社|合同会社|会社)/.test(text) || /(元請け|顧客|宛名)/.test(t)) {
+    const m = text.match(/(?:元請け|顧客|宛名)[:：\s]*([^\n]+)/)
+    next.client = (m?.[1] || text).trim()
+  }
+
+  // pricingPolicy（攻め/標準/慎重に正規化）
+  if (/(価格方針|攻め|標準|慎重|強気|安全|固め)/.test(t)) {
+    if (/(攻め|強気)/.test(t)) next.pricingPolicy = '攻め'
+    else if (/(慎重|安全|固め)/.test(t)) next.pricingPolicy = '慎重'
+    else if (/(標準)/.test(t)) next.pricingPolicy = '標準'
+    else {
+      const m = text.match(/価格方針[:：\s]*([^\n]+)/)
+      next.pricingPolicy = (m?.[1] || '').trim() || next.pricingPolicy
+    }
+  }
+
+  // margin（xx% へ正規化）
+  if (/(粗利|%|パーセント)/.test(t)) {
+    const m = text.match(/(\d{1,2}(?:\.\d+)?)\s*(%|パーセント)/)
+    if (m?.[1]) next.margin = `${m[1]}%`
+    else {
+      const n = text.match(/\d{1,2}(?:\.\d+)?/)
+      if (n?.[0]) next.margin = `${n[0]}%`
+    }
+  }
+
+  return next
+}
+
 const isExpenseComplete = (c: ExpenseCollected) =>
   c.receiptConfirmed && c.whenWhereWhatConfirmed && c.amountConfirmed && c.paymentMethodConfirmed
 
@@ -288,6 +330,7 @@ const isEstimatePhase2Complete = (c: EstimatePhase2Collected) =>
 const buildEstimateFinalSummary = (params: {
   phase1: EstimateCollected
   phase2: EstimatePhase2Collected
+  phase2Values?: EstimatePhase2Values
   overrides?: EstimateOverrides
   selectedProjectName?: string
 }) => {
@@ -312,8 +355,15 @@ const buildEstimateFinalSummary = (params: {
 
   const suffixFor = (key: keyof EstimateOverrides) => {
     const v = params.overrides?.[key]
-    if (!v) return ''
-    return `（修正: ${v}）`
+    if (v) return `（修正: ${v}）`
+
+    // phase2の実値（修正指示なしの場合の初回入力）
+    if (key === 'client' && params.phase2Values?.client) return `（入力: ${params.phase2Values.client}）`
+    if (key === 'pricingPolicy' && params.phase2Values?.pricingPolicy)
+      return `（入力: ${params.phase2Values.pricingPolicy}）`
+    if (key === 'margin' && params.phase2Values?.margin) return `（入力: ${params.phase2Values.margin}）`
+
+    return ''
   }
 
   const toLine = (label: string, ok: boolean, suffix = '') =>
@@ -362,12 +412,13 @@ const buildEstimateDraftMessage = (params: {
   phase1: EstimateCollected
   phase1Values: EstimatePhase1Values
   phase2: EstimatePhase2Collected
+  phase2Values: EstimatePhase2Values
   overrides: EstimateOverrides
   selectedProjectName?: string
 }) => {
   const o = params.overrides
 
-  const client = o.client || '（未入力）'
+  const client = o.client || params.phase2Values.client || '（未入力）'
   const project = params.selectedProjectName || '（未選択）'
 
   const work = params.phase1Values.work || (params.phase1.workConfirmed ? '（取得済み）' : '（未入力）')
@@ -379,8 +430,8 @@ const buildEstimateDraftMessage = (params: {
     o.dueDate || params.phase1Values.dueDate || (params.phase1.dueDateConfirmed ? '（取得済み）' : '（未入力）')
   const location = params.phase1Values.location || (params.phase1.locationConfirmed ? '（取得済み）' : '（未入力）')
 
-  const pricingPolicy = o.pricingPolicy || '（未入力）'
-  const margin = o.margin || '（未入力）'
+  const pricingPolicy = o.pricingPolicy || params.phase2Values.pricingPolicy || '（未入力）'
+  const margin = o.margin || params.phase2Values.margin || '（未入力）'
 
   const lines: string[] = []
   lines.push('見積たたき台（ダミー）')
@@ -686,6 +737,7 @@ export default function SimpleChatScreen() {
   const [estimatePhase2Collected, setEstimatePhase2Collected] = useState<EstimatePhase2Collected>(
     defaultEstimatePhase2Collected
   )
+  const [estimatePhase2Values, setEstimatePhase2Values] = useState<EstimatePhase2Values>(defaultEstimatePhase2Values)
   const [estimateOverrides, setEstimateOverrides] = useState<EstimateOverrides>(defaultEstimateOverrides)
   const [dailyReportCollected, setDailyReportCollected] = useState<DailyReportCollected>(defaultDailyReportCollected)
   const [invoiceCollected, setInvoiceCollected] = useState<InvoiceCollected>(defaultInvoiceCollected)
@@ -777,6 +829,7 @@ export default function SimpleChatScreen() {
             phase1: estimateCollected,
             phase1Values: estimatePhase1Values,
             phase2: estimatePhase2Collected,
+            phase2Values: estimatePhase2Values,
             overrides: estimateOverrides,
             selectedProjectName: selectedProject?.name,
           }),
@@ -804,9 +857,18 @@ export default function SimpleChatScreen() {
           setEstimateCollected(prev => ({ ...prev, quantityUnitConfirmed: true }))
           setEstimatePhase1Values(prev => ({ ...prev, quantityUnit: edits.quantityUnit }))
         }
-        if (edits.client) setEstimatePhase2Collected(prev => ({ ...prev, clientConfirmed: true }))
-        if (edits.pricingPolicy) setEstimatePhase2Collected(prev => ({ ...prev, pricingPolicyConfirmed: true }))
-        if (edits.margin) setEstimatePhase2Collected(prev => ({ ...prev, marginConfirmed: true }))
+        if (edits.client) {
+          setEstimatePhase2Collected(prev => ({ ...prev, clientConfirmed: true }))
+          setEstimatePhase2Values(prev => ({ ...prev, client: edits.client }))
+        }
+        if (edits.pricingPolicy) {
+          setEstimatePhase2Collected(prev => ({ ...prev, pricingPolicyConfirmed: true }))
+          setEstimatePhase2Values(prev => ({ ...prev, pricingPolicy: edits.pricingPolicy }))
+        }
+        if (edits.margin) {
+          setEstimatePhase2Collected(prev => ({ ...prev, marginConfirmed: true }))
+          setEstimatePhase2Values(prev => ({ ...prev, margin: edits.margin }))
+        }
 
         const updated = keys
           .filter(k => !!edits[k])
@@ -824,6 +886,7 @@ export default function SimpleChatScreen() {
           text: `了解。以下を反映しました：${updated.join(' / ')}\n\n${buildEstimateFinalSummary({
             phase1: estimateCollected,
             phase2: estimatePhase2Collected,
+            phase2Values: estimatePhase2Values,
             overrides: nextOverrides,
             selectedProjectName: selectedProject?.name,
           })}`,
@@ -846,6 +909,7 @@ export default function SimpleChatScreen() {
         setEstimatePhase1Values(defaultEstimatePhase1Values)
         setEstimatePhase(1)
         setEstimatePhase2Collected(defaultEstimatePhase2Collected)
+        setEstimatePhase2Values(defaultEstimatePhase2Values)
         setEstimateOverrides(defaultEstimateOverrides)
         setDailyReportCollected(defaultDailyReportCollected)
         setInvoiceCollected(defaultInvoiceCollected)
@@ -1013,6 +1077,7 @@ export default function SimpleChatScreen() {
             // Phase 2へ移行（intentは維持）
             setEstimatePhase(2)
             setEstimatePhase2Collected(defaultEstimatePhase2Collected)
+            setEstimatePhase2Values(defaultEstimatePhase2Values)
             setEstimateOverrides(defaultEstimateOverrides)
             return
           }
@@ -1031,6 +1096,9 @@ export default function SimpleChatScreen() {
         const nextCollected = extractEstimatePhase2Collected(trimmed, estimatePhase2Collected)
         setEstimatePhase2Collected(nextCollected)
 
+        const nextValues = extractEstimatePhase2Values(trimmed, estimatePhase2Values)
+        setEstimatePhase2Values(nextValues)
+
         const flags = [
           nextCollected.clientConfirmed,
           nextCollected.pricingPolicyConfirmed,
@@ -1044,6 +1112,7 @@ export default function SimpleChatScreen() {
             text: buildEstimateFinalSummary({
               phase1: estimateCollected,
               phase2: nextCollected,
+              phase2Values: nextValues,
               overrides: estimateOverrides,
               selectedProjectName: selectedProject?.name,
             }),
