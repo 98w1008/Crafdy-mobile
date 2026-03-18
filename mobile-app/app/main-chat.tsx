@@ -254,7 +254,7 @@ const buildEstimateFinalSummary = (params: {
     params.phase1.locationConfirmed,
   ]
 
-  const phase2Labels = ['元請け/顧客名', '価格方針（攻め/標準/慎重）', '希望粗利率（%）']
+  const phase2Labels = ['元請け/顧客名', '価格方針', '希望粗利率']
   const phase2Flags = [
     params.phase2.clientConfirmed,
     params.phase2.pricingPolicyConfirmed,
@@ -272,6 +272,8 @@ const buildEstimateFinalSummary = (params: {
     '',
     '【価格の前提】',
     ...phase2Labels.map((l, i) => toLine(l, !!phase2Flags[i])),
+    '',
+    '修正があれば、項目名を指定してチャットで指示してください（例：「希望納期を来週金曜に」）。',
   ].join('\n')
 }
 
