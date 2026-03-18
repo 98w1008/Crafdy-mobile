@@ -464,7 +464,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('estimate', 0, undefined, nextCollected)}\n\nOK。見積に必要な情報が揃いました。次は「単価の希望」や「材料/外注の有無」も必要なら聞きます。`,
+            text: `${buildProgressSummary('estimate', 0, undefined, nextCollected)}\n\nOK。見積の土台が揃いました。次に、以下3点を教えてください。\n・元請け/顧客名（誰に出す見積ですか？）\n・価格方針（攻め / 標準 / 慎重）\n・希望粗利率（%）`,
             sender: 'ai',
             timestamp: new Date(),
           }
