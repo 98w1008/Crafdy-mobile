@@ -408,14 +408,33 @@ const isEstimateGenerateInstruction = (text: string) => {
   )
 }
 
-const buildEstimateDraftMessage = (params: {
+type EstimateDraftLineItem = {
+  label: string
+  quantity: string
+  unitPrice: string
+  amount: string
+}
+
+type EstimateDraftData = {
+  client: string
+  project: string
+  work: string
+  quantityUnit: string
+  dueDate: string
+  location: string
+  pricingPolicy: string
+  margin: string
+  notes: string
+  lineItems: EstimateDraftLineItem[]
+}
+
+const buildEstimateDraftData = (params: {
   phase1: EstimateCollected
   phase1Values: EstimatePhase1Values
-  phase2: EstimatePhase2Collected
   phase2Values: EstimatePhase2Values
   overrides: EstimateOverrides
   selectedProjectName?: string
-}) => {
+}): EstimateDraftData => {
   const o = params.overrides
 
   const client = o.client || params.phase2Values.client || '（未入力）'
@@ -433,24 +452,53 @@ const buildEstimateDraftMessage = (params: {
   const pricingPolicy = o.pricingPolicy || params.phase2Values.pricingPolicy || '（未入力）'
   const margin = o.margin || params.phase2Values.margin || '（未入力）'
 
+  const lineItems: EstimateDraftLineItem[] = [
+    { label: '○○工事', quantity: '一式', unitPrice: '未設定', amount: '未設定' },
+  ]
+
+  if (o.quantityUnit) {
+    lineItems.push({
+      label: '数量ベース行（仮）',
+      quantity: o.quantityUnit,
+      unitPrice: '未設定',
+      amount: '未設定',
+    })
+  }
+
+  return {
+    client,
+    project,
+    work,
+    quantityUnit,
+    dueDate,
+    location,
+    pricingPolicy,
+    margin,
+    notes: '金額計算・正式な見積書出力（PDF/Excel）はまだ未対応です。',
+    lineItems,
+  }
+}
+
+const buildEstimateDraftMessage = (data: EstimateDraftData) => {
   const lines: string[] = []
   lines.push('見積たたき台（ダミー）')
-  lines.push(`宛名: ${client}`)
-  lines.push(`現場: ${project}`)
+  lines.push(`宛名: ${data.client}`)
+  lines.push(`現場: ${data.project}`)
   lines.push('')
   lines.push('【条件】')
-  lines.push(`・工事/作業内容: ${work}`)
-  lines.push(`・数量/単位: ${quantityUnit}`)
-  lines.push(`・希望納期: ${dueDate}`)
-  lines.push(`・現場住所: ${location}`)
-  lines.push(`・価格方針: ${pricingPolicy}`)
-  lines.push(`・希望粗利率: ${margin}`)
+  lines.push(`・工事/作業内容: ${data.work}`)
+  lines.push(`・数量/単位: ${data.quantityUnit}`)
+  lines.push(`・希望納期: ${data.dueDate}`)
+  lines.push(`・現場住所: ${data.location}`)
+  lines.push(`・価格方針: ${data.pricingPolicy}`)
+  lines.push(`・希望粗利率: ${data.margin}`)
   lines.push('')
   lines.push('【明細（仮）】')
-  lines.push('・○○工事　一式')
-  if (o.quantityUnit) lines.push(`・数量ベース行（仮）: ${o.quantityUnit} × 単価（未設定）`)
+  for (const item of data.lineItems) {
+    lines.push(`・${item.label}	${item.quantity}	単価:${item.unitPrice}	金額:${item.amount}`)
+  }
   lines.push('')
-  lines.push('備考: 金額計算・正式な見積書出力（PDF/Excel）はまだ未対応です。')
+  lines.push(`備考: ${data.notes}`)
   lines.push('修正があれば、項目名を指定してチャットで指示してください。')
 
   return lines.join('\n')
@@ -825,14 +873,15 @@ export default function SimpleChatScreen() {
       if (isEstimateGenerateInstruction(trimmed)) {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: buildEstimateDraftMessage({
-            phase1: estimateCollected,
-            phase1Values: estimatePhase1Values,
-            phase2: estimatePhase2Collected,
-            phase2Values: estimatePhase2Values,
-            overrides: estimateOverrides,
-            selectedProjectName: selectedProject?.name,
-          }),
+          text: buildEstimateDraftMessage(
+            buildEstimateDraftData({
+              phase1: estimateCollected,
+              phase1Values: estimatePhase1Values,
+              phase2Values: estimatePhase2Values,
+              overrides: estimateOverrides,
+              selectedProjectName: selectedProject?.name,
+            })
+          ),
           sender: 'ai',
           timestamp: new Date(),
         }
