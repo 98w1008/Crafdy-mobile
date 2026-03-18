@@ -237,6 +237,44 @@ const isEstimateComplete = (c: EstimateCollected) =>
 const isEstimatePhase2Complete = (c: EstimatePhase2Collected) =>
   c.clientConfirmed && c.pricingPolicyConfirmed && c.marginConfirmed
 
+const buildEstimateFinalSummary = (params: {
+  phase1: EstimateCollected
+  phase2: EstimatePhase2Collected
+  selectedProjectName?: string
+}) => {
+  const projectLine = params.selectedProjectName
+    ? `現場: ${params.selectedProjectName}`
+    : '現場: 未選択'
+
+  const phase1Labels = getIntentFields('estimate')
+  const phase1Flags = [
+    params.phase1.workConfirmed,
+    params.phase1.quantityUnitConfirmed,
+    params.phase1.dueDateConfirmed,
+    params.phase1.locationConfirmed,
+  ]
+
+  const phase2Labels = ['元請け/顧客名', '価格方針（攻め/標準/慎重）', '希望粗利率（%）']
+  const phase2Flags = [
+    params.phase2.clientConfirmed,
+    params.phase2.pricingPolicyConfirmed,
+    params.phase2.marginConfirmed,
+  ]
+
+  const toLine = (label: string, ok: boolean) => `・${label}: ${ok ? '取得済み' : '未確認'}`
+
+  return [
+    '最終確認（見積）',
+    projectLine,
+    '',
+    '【見積の土台】',
+    ...phase1Labels.map((l, i) => toLine(l, !!phase1Flags[i])),
+    '',
+    '【価格の前提】',
+    ...phase2Labels.map((l, i) => toLine(l, !!phase2Flags[i])),
+  ].join('\n')
+}
+
 const extractInvoiceCollected = (text: string, prev: InvoiceCollected): InvoiceCollected => {
   const t = text.toLowerCase()
 
@@ -747,7 +785,11 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。価格の前提が揃いました。次は「単価の叩き台」や「攻め/標準/慎重の3ライン案」まで作れます。`,
+            text: buildEstimateFinalSummary({
+              phase1: estimateCollected,
+              phase2: nextCollected,
+              selectedProjectName: selectedProject?.name,
+            }),
             sender: 'ai',
             timestamp: new Date(),
           }
