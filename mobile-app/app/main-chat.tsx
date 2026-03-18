@@ -45,6 +45,13 @@ type EstimateCollected = {
   locationConfirmed: boolean
 }
 
+type EstimatePhase1Values = {
+  work?: string
+  quantityUnit?: string
+  dueDate?: string
+  location?: string
+}
+
 type EstimatePhase = 1 | 2
 
 type EstimatePhase2Collected = {
@@ -102,6 +109,8 @@ const defaultEstimateCollected: EstimateCollected = {
   dueDateConfirmed: false,
   locationConfirmed: false,
 }
+
+const defaultEstimatePhase1Values: EstimatePhase1Values = {}
 
 const defaultEstimatePhase2Collected: EstimatePhase2Collected = {
   clientConfirmed: false,
@@ -179,6 +188,35 @@ const extractEstimateCollected = (text: string, prev: EstimateCollected): Estima
   // 現場住所（ざっくり判定）
   if (/(都|道|府|県|市|区|町|村)/.test(t) || /(現場|住所)/.test(t)) {
     next.locationConfirmed = true
+  }
+
+  return next
+}
+
+const extractEstimatePhase1Values = (text: string, prev: EstimatePhase1Values): EstimatePhase1Values => {
+  const t = text.toLowerCase()
+  const next: EstimatePhase1Values = { ...prev }
+
+  // 数量/単位（優先度高）
+  const qty = text.match(/(\d+\s*(?:個|台|m2|㎡|m|式|箇所|本|枚))/)
+  if (qty?.[1]) next.quantityUnit = qty[1].trim()
+
+  // 希望納期（優先度高：ラベル付き or 日付っぽい）
+  const dueLabeled = text.match(/(?:希望納期|納期|いつまで)[:：\s]*([^\n]+)/)
+  if (dueLabeled?.[1]) next.dueDate = dueLabeled[1].trim()
+  else if (/(今週|来週|月末|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/.test(t)) next.dueDate = text.trim()
+
+  // 工事/作業内容（雑でOK）
+  if (/(工事|作業|交換|取付|取り付け|設置|修理|塗装|撤去|補修)/.test(t) && t.length >= 4) {
+    // 「〜を」以降をざっくり拾う
+    const m = text.match(/(.{4,})/)
+    next.work = (m?.[1] || text).trim()
+  }
+
+  // 現場住所（雑でOK）
+  if (/(都|道|府|県|市|区|町|村)/.test(t) || /(現場|住所)/.test(t)) {
+    const m = text.match(/(?:現場|住所)[:：\s]*([^\n]+)/)
+    next.location = (m?.[1] || text).trim()
   }
 
   return next
@@ -322,6 +360,7 @@ const isEstimateGenerateInstruction = (text: string) => {
 
 const buildEstimateDraftMessage = (params: {
   phase1: EstimateCollected
+  phase1Values: EstimatePhase1Values
   phase2: EstimatePhase2Collected
   overrides: EstimateOverrides
   selectedProjectName?: string
@@ -331,10 +370,14 @@ const buildEstimateDraftMessage = (params: {
   const client = o.client || '（未入力）'
   const project = params.selectedProjectName || '（未選択）'
 
-  // Phase1は値を保持していないので、取得できていても「値」は未入力になりうる。
-  const work = '（未入力）'
-  const quantityUnit = o.quantityUnit || (params.phase1.quantityUnitConfirmed ? '（取得済み）' : '（未入力）')
-  const dueDate = o.dueDate || (params.phase1.dueDateConfirmed ? '（取得済み）' : '（未入力）')
+  const work = params.phase1Values.work || (params.phase1.workConfirmed ? '（取得済み）' : '（未入力）')
+  const quantityUnit =
+    o.quantityUnit ||
+    params.phase1Values.quantityUnit ||
+    (params.phase1.quantityUnitConfirmed ? '（取得済み）' : '（未入力）')
+  const dueDate =
+    o.dueDate || params.phase1Values.dueDate || (params.phase1.dueDateConfirmed ? '（取得済み）' : '（未入力）')
+  const location = params.phase1Values.location || (params.phase1.locationConfirmed ? '（取得済み）' : '（未入力）')
 
   const pricingPolicy = o.pricingPolicy || '（未入力）'
   const margin = o.margin || '（未入力）'
@@ -348,6 +391,7 @@ const buildEstimateDraftMessage = (params: {
   lines.push(`・工事/作業内容: ${work}`)
   lines.push(`・数量/単位: ${quantityUnit}`)
   lines.push(`・希望納期: ${dueDate}`)
+  lines.push(`・現場住所: ${location}`)
   lines.push(`・価格方針: ${pricingPolicy}`)
   lines.push(`・希望粗利率: ${margin}`)
   lines.push('')
@@ -637,6 +681,7 @@ export default function SimpleChatScreen() {
   const [intentStep, setIntentStep] = useState(0)
   const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
   const [estimateCollected, setEstimateCollected] = useState<EstimateCollected>(defaultEstimateCollected)
+  const [estimatePhase1Values, setEstimatePhase1Values] = useState<EstimatePhase1Values>(defaultEstimatePhase1Values)
   const [estimatePhase, setEstimatePhase] = useState<EstimatePhase>(1)
   const [estimatePhase2Collected, setEstimatePhase2Collected] = useState<EstimatePhase2Collected>(
     defaultEstimatePhase2Collected
@@ -730,6 +775,7 @@ export default function SimpleChatScreen() {
           id: (Date.now() + 1).toString(),
           text: buildEstimateDraftMessage({
             phase1: estimateCollected,
+            phase1Values: estimatePhase1Values,
             phase2: estimatePhase2Collected,
             overrides: estimateOverrides,
             selectedProjectName: selectedProject?.name,
@@ -750,8 +796,14 @@ export default function SimpleChatScreen() {
         const nextOverrides: EstimateOverrides = { ...estimateOverrides, ...edits }
         setEstimateOverrides(nextOverrides)
 
-        if (edits.dueDate) setEstimateCollected(prev => ({ ...prev, dueDateConfirmed: true }))
-        if (edits.quantityUnit) setEstimateCollected(prev => ({ ...prev, quantityUnitConfirmed: true }))
+        if (edits.dueDate) {
+          setEstimateCollected(prev => ({ ...prev, dueDateConfirmed: true }))
+          setEstimatePhase1Values(prev => ({ ...prev, dueDate: edits.dueDate }))
+        }
+        if (edits.quantityUnit) {
+          setEstimateCollected(prev => ({ ...prev, quantityUnitConfirmed: true }))
+          setEstimatePhase1Values(prev => ({ ...prev, quantityUnit: edits.quantityUnit }))
+        }
         if (edits.client) setEstimatePhase2Collected(prev => ({ ...prev, clientConfirmed: true }))
         if (edits.pricingPolicy) setEstimatePhase2Collected(prev => ({ ...prev, pricingPolicyConfirmed: true }))
         if (edits.margin) setEstimatePhase2Collected(prev => ({ ...prev, marginConfirmed: true }))
@@ -791,6 +843,7 @@ export default function SimpleChatScreen() {
         setIntentStep(0)
         setExpenseCollected(defaultExpenseCollected)
         setEstimateCollected(defaultEstimateCollected)
+        setEstimatePhase1Values(defaultEstimatePhase1Values)
         setEstimatePhase(1)
         setEstimatePhase2Collected(defaultEstimatePhase2Collected)
         setEstimateOverrides(defaultEstimateOverrides)
@@ -936,6 +989,9 @@ export default function SimpleChatScreen() {
         if (estimatePhase === 1) {
           const nextCollected = extractEstimateCollected(trimmed, estimateCollected)
           setEstimateCollected(nextCollected)
+
+          const nextValues = extractEstimatePhase1Values(trimmed, estimatePhase1Values)
+          setEstimatePhase1Values(nextValues)
 
           const flags = [
             nextCollected.workConfirmed,
