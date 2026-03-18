@@ -410,9 +410,12 @@ const isEstimateGenerateInstruction = (text: string) => {
 
 type EstimateDraftLineItem = {
   label: string
+  description?: string
   quantity: string
+  unit: string
   unitPrice: string
   amount: string
+  notes?: string
 }
 
 type EstimateDraftData = {
@@ -457,16 +460,48 @@ const buildEstimateDraftData = (params: {
   const pricingPolicy = o.pricingPolicy || params.phase2Values.pricingPolicy || '（未入力）'
   const margin = o.margin || params.phase2Values.margin || '（未入力）'
 
-  const lineItems: EstimateDraftLineItem[] = [
-    { label: '○○工事', quantity: '一式', unitPrice: '未設定', amount: '未設定' },
-  ]
+  const lineItems: EstimateDraftLineItem[] = []
 
-  if (o.quantityUnit) {
+  // 本工事（work をベースに「内訳っぽい」1行を作る）
+  lineItems.push({
+    label: '本工事',
+    description: work !== '（未入力）' ? work : undefined,
+    quantity: '1',
+    unit: '式',
+    unitPrice: '未設定',
+    amount: '未設定',
+  })
+
+  // 数量ベース（数量/単位が取れていれば、それを優先して行を作る）
+  if (quantityUnit && quantityUnit !== '（未入力）' && quantityUnit !== '（取得済み）') {
+    // 例: "10台" -> quantity: "10", unit: "台"
+    const m = quantityUnit.match(/^(\d+)\s*([^\d\s]+)$/)
+    const qty = m?.[1] || quantityUnit
+    const unit = m?.[2] || '式'
     lineItems.push({
-      label: '数量ベース行（仮）',
-      quantity: o.quantityUnit,
+      label: '数量ベース行',
+      description: '数量/単位ベースの仮行',
+      quantity: qty,
+      unit,
       unitPrice: '未設定',
       amount: '未設定',
+    })
+  }
+
+  // 諸条件（場所や納期などを notes に寄せる）
+  const conditionsNotes: string[] = []
+  if (location && location !== '（未入力）' && location !== '（取得済み）') conditionsNotes.push(`現場住所: ${location}`)
+  if (dueDate && dueDate !== '（未入力）' && dueDate !== '（取得済み）') conditionsNotes.push(`希望納期: ${dueDate}`)
+
+  if (conditionsNotes.length > 0) {
+    lineItems.push({
+      label: '諸条件',
+      description: '現場/納期など',
+      quantity: '1',
+      unit: '式',
+      unitPrice: '未設定',
+      amount: '未設定',
+      notes: conditionsNotes.join(' / '),
     })
   }
 
@@ -503,9 +538,13 @@ const buildEstimateDraftMessage = (data: EstimateDraftData) => {
   lines.push(`・価格方針: ${data.conditions.pricingPolicy}`)
   lines.push(`・希望粗利率: ${data.conditions.margin}`)
   lines.push('')
-  lines.push('【明細（仮）】')
+  lines.push('【内訳（仮）】')
   for (const item of data.lineItems) {
-    lines.push(`・${item.label}	${item.quantity}	単価:${item.unitPrice}	金額:${item.amount}`)
+    const desc = item.description ? `（${item.description}）` : ''
+    const notes = item.notes ? ` / ${item.notes}` : ''
+    lines.push(
+      `・${item.label}${desc}：${item.quantity}${item.unit} / 単価:${item.unitPrice} / 金額:${item.amount}${notes}`
+    )
   }
   lines.push('')
   lines.push(`備考: ${data.notes}`)
