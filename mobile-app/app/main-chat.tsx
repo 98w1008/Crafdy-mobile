@@ -38,6 +38,13 @@ type ExpenseCollected = {
   paymentMethodConfirmed: boolean
 }
 
+type EstimateCollected = {
+  workConfirmed: boolean
+  quantityUnitConfirmed: boolean
+  dueDateConfirmed: boolean
+  locationConfirmed: boolean
+}
+
 const classifyIntentCategory = (text: string): IntentCategory | null => {
   const t = text.toLowerCase()
 
@@ -57,6 +64,13 @@ const defaultExpenseCollected: ExpenseCollected = {
   whenWhereWhatConfirmed: false,
   amountConfirmed: false,
   paymentMethodConfirmed: false,
+}
+
+const defaultEstimateCollected: EstimateCollected = {
+  workConfirmed: false,
+  quantityUnitConfirmed: false,
+  dueDateConfirmed: false,
+  locationConfirmed: false,
 }
 
 const extractExpenseCollected = (text: string, prev: ExpenseCollected): ExpenseCollected => {
@@ -90,8 +104,39 @@ const extractExpenseCollected = (text: string, prev: ExpenseCollected): ExpenseC
   return next
 }
 
+const extractEstimateCollected = (text: string, prev: EstimateCollected): EstimateCollected => {
+  const t = text.toLowerCase()
+
+  const next: EstimateCollected = { ...prev }
+
+  // 工事/作業内容
+  if (/(工事|作業|交換|取付|取り付け|設置|修理|塗装|撤去|補修)/.test(t) && t.length >= 4) {
+    next.workConfirmed = true
+  }
+
+  // 数量/単位
+  if (/\d+\s*(個|台|m2|㎡|m|式|箇所|本|枚)/.test(t)) {
+    next.quantityUnitConfirmed = true
+  }
+
+  // 希望納期
+  if (/(納期|まで|今週|来週|月末|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/.test(t)) {
+    next.dueDateConfirmed = true
+  }
+
+  // 現場住所（ざっくり判定）
+  if (/(都|道|府|県|市|区|町|村)/.test(t) || /(現場|住所)/.test(t)) {
+    next.locationConfirmed = true
+  }
+
+  return next
+}
+
 const isExpenseComplete = (c: ExpenseCollected) =>
   c.receiptConfirmed && c.whenWhereWhatConfirmed && c.amountConfirmed && c.paymentMethodConfirmed
+
+const isEstimateComplete = (c: EstimateCollected) =>
+  c.workConfirmed && c.quantityUnitConfirmed && c.dueDateConfirmed && c.locationConfirmed
 
 const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: string) => {
   const projectNote = selectedProjectName
@@ -158,7 +203,8 @@ const getIntentQuestionCount = (category: IntentCategory) => {
 const buildProgressSummary = (
   category: IntentCategory,
   step: number,
-  expenseCollected?: ExpenseCollected
+  expenseCollected?: ExpenseCollected,
+  estimateCollected?: EstimateCollected
 ) => {
   const fields = getIntentFields(category)
 
@@ -176,6 +222,14 @@ const buildProgressSummary = (
         expenseCollected.paymentMethodConfirmed,
       ]
       status = flags[idx] ? '取得済み' : '未確認'
+    } else if (category === 'estimate' && estimateCollected) {
+      const flags = [
+        estimateCollected.workConfirmed,
+        estimateCollected.quantityUnitConfirmed,
+        estimateCollected.dueDateConfirmed,
+        estimateCollected.locationConfirmed,
+      ]
+      status = flags[idx] ? '取得済み' : '未確認'
     } else {
       status = idx < step ? '取得済み' : '未確認'
     }
@@ -190,13 +244,14 @@ const buildFollowupAiReply = (
   category: IntentCategory,
   step: number,
   selectedProjectName?: string,
-  expenseCollected?: ExpenseCollected
+  expenseCollected?: ExpenseCollected,
+  estimateCollected?: EstimateCollected
 ) => {
   const projectNote = selectedProjectName
     ? `（現場: ${selectedProjectName}）`
     : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
 
-  const progress = buildProgressSummary(category, step, expenseCollected)
+  const progress = buildProgressSummary(category, step, expenseCollected, estimateCollected)
 
   // NOTE: 最小実装。stepに応じて「次に聞くべきこと」を1つずつ進める。
   switch (category) {
@@ -249,6 +304,7 @@ export default function SimpleChatScreen() {
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
   const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
+  const [estimateCollected, setEstimateCollected] = useState<EstimateCollected>(defaultEstimateCollected)
 
   const { newProjectId, newProjectName } = useLocalSearchParams<{ newProjectId: string; newProjectName: string }>()
 
@@ -332,6 +388,7 @@ export default function SimpleChatScreen() {
         setCurrentIntent(category)
         setIntentStep(0)
         setExpenseCollected(defaultExpenseCollected)
+        setEstimateCollected(defaultEstimateCollected)
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -385,6 +442,42 @@ export default function SimpleChatScreen() {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           text: buildFollowupAiReply('expense', nextIndex, selectedProject?.name, nextCollected),
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+
+      if (currentIntent === 'estimate') {
+        const nextCollected = extractEstimateCollected(trimmed, estimateCollected)
+        setEstimateCollected(nextCollected)
+
+        const flags = [
+          nextCollected.workConfirmed,
+          nextCollected.quantityUnitConfirmed,
+          nextCollected.dueDateConfirmed,
+          nextCollected.locationConfirmed,
+        ]
+        const nextIndex = flags.findIndex(v => !v)
+
+        if (nextIndex === -1) {
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `${buildProgressSummary('estimate', 0, undefined, nextCollected)}\n\nOK。見積に必要な情報が揃いました。次は「単価の希望」や「材料/外注の有無」も必要なら聞きます。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          setCurrentIntent(null)
+          setIntentStep(0)
+          setEstimateCollected(defaultEstimateCollected)
+          return
+        }
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: buildFollowupAiReply('estimate', nextIndex, selectedProject?.name, undefined, nextCollected),
           sender: 'ai',
           timestamp: new Date(),
         }
