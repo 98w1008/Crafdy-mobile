@@ -45,6 +45,14 @@ type EstimateCollected = {
   locationConfirmed: boolean
 }
 
+type EstimatePhase = 1 | 2
+
+type EstimatePhase2Collected = {
+  clientConfirmed: boolean
+  pricingPolicyConfirmed: boolean
+  marginConfirmed: boolean
+}
+
 type DailyReportCollected = {
   dateConfirmed: boolean
   workConfirmed: boolean
@@ -85,6 +93,12 @@ const defaultEstimateCollected: EstimateCollected = {
   quantityUnitConfirmed: false,
   dueDateConfirmed: false,
   locationConfirmed: false,
+}
+
+const defaultEstimatePhase2Collected: EstimatePhase2Collected = {
+  clientConfirmed: false,
+  pricingPolicyConfirmed: false,
+  marginConfirmed: false,
 }
 
 const defaultDailyReportCollected: DailyReportCollected = {
@@ -160,6 +174,32 @@ const extractEstimateCollected = (text: string, prev: EstimateCollected): Estima
   return next
 }
 
+const extractEstimatePhase2Collected = (
+  text: string,
+  prev: EstimatePhase2Collected
+): EstimatePhase2Collected => {
+  const t = text.toLowerCase()
+
+  const next: EstimatePhase2Collected = { ...prev }
+
+  // 元請け/顧客名（会社名っぽい/御中など）
+  if (/(御中|株式会社|有限会社|合同会社|会社)/.test(text) || /(会社|御中)/.test(t)) {
+    next.clientConfirmed = true
+  }
+
+  // 価格方針
+  if (/(攻め|標準|慎重|強気|安全|固め)/.test(t)) {
+    next.pricingPolicyConfirmed = true
+  }
+
+  // 希望粗利率
+  if ((/(%|パーセント)/.test(t) && /\d/.test(t)) || (/(粗利)/.test(t) && /\d/.test(t))) {
+    next.marginConfirmed = true
+  }
+
+  return next
+}
+
 const isExpenseComplete = (c: ExpenseCollected) =>
   c.receiptConfirmed && c.whenWhereWhatConfirmed && c.amountConfirmed && c.paymentMethodConfirmed
 
@@ -193,6 +233,9 @@ const extractDailyReportCollected = (text: string, prev: DailyReportCollected): 
 
 const isEstimateComplete = (c: EstimateCollected) =>
   c.workConfirmed && c.quantityUnitConfirmed && c.dueDateConfirmed && c.locationConfirmed
+
+const isEstimatePhase2Complete = (c: EstimatePhase2Collected) =>
+  c.clientConfirmed && c.pricingPolicyConfirmed && c.marginConfirmed
 
 const extractInvoiceCollected = (text: string, prev: InvoiceCollected): InvoiceCollected => {
   const t = text.toLowerCase()
@@ -422,6 +465,10 @@ export default function SimpleChatScreen() {
   const [intentStep, setIntentStep] = useState(0)
   const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
   const [estimateCollected, setEstimateCollected] = useState<EstimateCollected>(defaultEstimateCollected)
+  const [estimatePhase, setEstimatePhase] = useState<EstimatePhase>(1)
+  const [estimatePhase2Collected, setEstimatePhase2Collected] = useState<EstimatePhase2Collected>(
+    defaultEstimatePhase2Collected
+  )
   const [dailyReportCollected, setDailyReportCollected] = useState<DailyReportCollected>(defaultDailyReportCollected)
   const [invoiceCollected, setInvoiceCollected] = useState<InvoiceCollected>(defaultInvoiceCollected)
 
@@ -508,6 +555,8 @@ export default function SimpleChatScreen() {
         setIntentStep(0)
         setExpenseCollected(defaultExpenseCollected)
         setEstimateCollected(defaultEstimateCollected)
+        setEstimatePhase(1)
+        setEstimatePhase2Collected(defaultEstimatePhase2Collected)
         setDailyReportCollected(defaultDailyReportCollected)
         setInvoiceCollected(defaultInvoiceCollected)
 
@@ -646,36 +695,84 @@ export default function SimpleChatScreen() {
       }
 
       if (currentIntent === 'estimate') {
-        const nextCollected = extractEstimateCollected(trimmed, estimateCollected)
-        setEstimateCollected(nextCollected)
+        // Phase 1: 見積の土台（4項目）
+        if (estimatePhase === 1) {
+          const nextCollected = extractEstimateCollected(trimmed, estimateCollected)
+          setEstimateCollected(nextCollected)
+
+          const flags = [
+            nextCollected.workConfirmed,
+            nextCollected.quantityUnitConfirmed,
+            nextCollected.dueDateConfirmed,
+            nextCollected.locationConfirmed,
+          ]
+          const nextIndex = flags.findIndex(v => !v)
+
+          if (nextIndex === -1) {
+            const aiMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined, undefined)}\n\nOK。見積の土台が揃いました。次に、以下3点を教えてください。\n・元請け/顧客名（誰に出す見積ですか？）\n・価格方針（攻め / 標準 / 慎重）\n・希望粗利率（%）`,
+              sender: 'ai',
+              timestamp: new Date(),
+            }
+            setMessages(prev => [...prev, aiMessage])
+
+            // Phase 2へ移行（intentは維持）
+            setEstimatePhase(2)
+            setEstimatePhase2Collected(defaultEstimatePhase2Collected)
+            return
+          }
+
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: buildFollowupAiReply('estimate', nextIndex, selectedProject?.name, undefined, nextCollected, undefined, undefined),
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        // Phase 2: 元請け/価格方針/粗利率
+        const nextCollected = extractEstimatePhase2Collected(trimmed, estimatePhase2Collected)
+        setEstimatePhase2Collected(nextCollected)
 
         const flags = [
-          nextCollected.workConfirmed,
-          nextCollected.quantityUnitConfirmed,
-          nextCollected.dueDateConfirmed,
-          nextCollected.locationConfirmed,
+          nextCollected.clientConfirmed,
+          nextCollected.pricingPolicyConfirmed,
+          nextCollected.marginConfirmed,
         ]
         const nextIndex = flags.findIndex(v => !v)
 
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined, undefined)}\n\nOK。見積の土台が揃いました。次に、以下3点を教えてください。\n・元請け/顧客名（誰に出す見積ですか？）\n・価格方針（攻め / 標準 / 慎重）\n・希望粗利率（%）`,
+            text: `OK。価格の前提が揃いました。次は「単価の叩き台」や「攻め/標準/慎重の3ライン案」まで作れます。`,
             sender: 'ai',
             timestamp: new Date(),
           }
           setMessages(prev => [...prev, aiMessage])
+
           setCurrentIntent(null)
           setIntentStep(0)
           setEstimateCollected(defaultEstimateCollected)
-          setDailyReportCollected(defaultDailyReportCollected)
-          setInvoiceCollected(defaultInvoiceCollected)
+          setEstimatePhase(1)
+          setEstimatePhase2Collected(defaultEstimatePhase2Collected)
           return
         }
 
+        const questions = [
+          '元請け/顧客名は？',
+          '価格方針は？（攻め / 標準 / 慎重）',
+          '希望粗利率（%）は？',
+        ]
+        const projectNote = selectedProject?.name
+          ? `（現場: ${selectedProject.name}）`
+          : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
+
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: buildFollowupAiReply('estimate', nextIndex, selectedProject?.name, undefined, nextCollected, undefined, undefined),
+          text: `${questions[nextIndex]}\n${projectNote}`,
           sender: 'ai',
           timestamp: new Date(),
         }
