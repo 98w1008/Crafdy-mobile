@@ -436,6 +436,66 @@ type EstimateDraftData = {
   notes: string
 }
 
+type EstimateTemplatePayloadRow = {
+  label: string
+  description?: string
+  quantity: string
+  unit: string
+  unitPrice: string
+  amount: string
+  notes?: string
+}
+
+type EstimateTemplatePayload = {
+  document: {
+    title: string
+    client: string
+    project: string
+  }
+  summary: {
+    work: string
+    quantityUnit: string
+    dueDate: string
+    location: string
+    pricingPolicy: string
+    margin: string
+  }
+  rows: EstimateTemplatePayloadRow[]
+  footer: {
+    notes: string
+  }
+}
+
+const buildEstimateTemplatePayload = (data: EstimateDraftData): EstimateTemplatePayload => {
+  return {
+    document: {
+      title: data.header.title,
+      client: data.header.client,
+      project: data.header.project,
+    },
+    summary: {
+      work: data.conditions.work,
+      quantityUnit: data.conditions.quantityUnit,
+      dueDate: data.conditions.dueDate,
+      location: data.conditions.location,
+      pricingPolicy: data.conditions.pricingPolicy,
+      margin: data.conditions.margin,
+    },
+    rows: data.lineItems.map(item => ({
+      label: item.label,
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: item.unitPrice,
+      amount: item.amount,
+      notes: item.notes,
+    })),
+    footer: {
+      notes: data.notes,
+    },
+  }
+}
+
 const buildEstimateDraftData = (params: {
   phase1: EstimateCollected
   phase1Values: EstimatePhase1Values
@@ -525,29 +585,29 @@ const buildEstimateDraftData = (params: {
 }
 
 const buildEstimateDraftMessage = (data: EstimateDraftData) => {
+  const payload = buildEstimateTemplatePayload(data)
+
   const lines: string[] = []
-  lines.push(data.header.title)
-  lines.push(`宛名: ${data.header.client}`)
-  lines.push(`現場: ${data.header.project}`)
+  lines.push(payload.document.title)
+  lines.push(`宛名: ${payload.document.client}`)
+  lines.push(`現場: ${payload.document.project}`)
   lines.push('')
   lines.push('【条件】')
-  lines.push(`・工事/作業内容: ${data.conditions.work}`)
-  lines.push(`・数量/単位: ${data.conditions.quantityUnit}`)
-  lines.push(`・希望納期: ${data.conditions.dueDate}`)
-  lines.push(`・現場住所: ${data.conditions.location}`)
-  lines.push(`・価格方針: ${data.conditions.pricingPolicy}`)
-  lines.push(`・希望粗利率: ${data.conditions.margin}`)
+  lines.push(`・工事/作業内容: ${payload.summary.work}`)
+  lines.push(`・数量/単位: ${payload.summary.quantityUnit}`)
+  lines.push(`・希望納期: ${payload.summary.dueDate}`)
+  lines.push(`・現場住所: ${payload.summary.location}`)
+  lines.push(`・価格方針: ${payload.summary.pricingPolicy}`)
+  lines.push(`・希望粗利率: ${payload.summary.margin}`)
   lines.push('')
   lines.push('【内訳（仮）】')
-  for (const item of data.lineItems) {
-    const desc = item.description ? `（${item.description}）` : ''
-    const notes = item.notes ? ` / ${item.notes}` : ''
-    lines.push(
-      `・${item.label}${desc}：${item.quantity}${item.unit} / 単価:${item.unitPrice} / 金額:${item.amount}${notes}`
-    )
+  for (const row of payload.rows) {
+    const desc = row.description ? `（${row.description}）` : ''
+    const notes = row.notes ? ` / ${row.notes}` : ''
+    lines.push(`・${row.label}${desc}：${row.quantity}${row.unit} / 単価:${row.unitPrice} / 金額:${row.amount}${notes}`)
   }
   lines.push('')
-  lines.push(`備考: ${data.notes}`)
+  lines.push(`備考: ${payload.footer.notes}`)
   lines.push('修正があれば、項目名を指定してチャットで指示してください。')
 
   return lines.join('\n')
