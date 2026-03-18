@@ -311,6 +311,56 @@ const getLastAiText = (messages: Message[]) => {
   return null
 }
 
+const isEstimateGenerateInstruction = (text: string) => {
+  const t = text.toLowerCase()
+  return (
+    /(作って|作成|たたき台|この内容で|お願いします)/.test(text) ||
+    /(estimate)/.test(t) ||
+    /(見積|見積もり|見積り)/.test(text)
+  )
+}
+
+const buildEstimateDraftMessage = (params: {
+  phase1: EstimateCollected
+  phase2: EstimatePhase2Collected
+  overrides: EstimateOverrides
+  selectedProjectName?: string
+}) => {
+  const o = params.overrides
+
+  const client = o.client || '（未入力）'
+  const project = params.selectedProjectName || '（未選択）'
+
+  // Phase1は値を保持していないので、取得できていても「値」は未入力になりうる。
+  const work = '（未入力）'
+  const quantityUnit = o.quantityUnit || (params.phase1.quantityUnitConfirmed ? '（取得済み）' : '（未入力）')
+  const dueDate = o.dueDate || (params.phase1.dueDateConfirmed ? '（取得済み）' : '（未入力）')
+
+  const pricingPolicy = o.pricingPolicy || '（未入力）'
+  const margin = o.margin || '（未入力）'
+
+  const lines: string[] = []
+  lines.push('見積たたき台（ダミー）')
+  lines.push(`宛名: ${client}`)
+  lines.push(`現場: ${project}`)
+  lines.push('')
+  lines.push('【条件】')
+  lines.push(`・工事/作業内容: ${work}`)
+  lines.push(`・数量/単位: ${quantityUnit}`)
+  lines.push(`・希望納期: ${dueDate}`)
+  lines.push(`・価格方針: ${pricingPolicy}`)
+  lines.push(`・希望粗利率: ${margin}`)
+  lines.push('')
+  lines.push('【明細（仮）】')
+  lines.push('・○○工事　一式')
+  if (o.quantityUnit) lines.push(`・数量ベース行（仮）: ${o.quantityUnit} × 単価（未設定）`)
+  lines.push('')
+  lines.push('備考: 金額計算・正式な見積書出力（PDF/Excel）はまだ未対応です。')
+  lines.push('修正があれば、項目名を指定してチャットで指示してください。')
+
+  return lines.join('\n')
+}
+
 const parseEstimateEditInstruction = (text: string) => {
   const t = text.toLowerCase()
 
@@ -672,8 +722,26 @@ export default function SimpleChatScreen() {
     setMessages(prev => [...prev, userMessage])
     setInputText('')
 
-    // 見積の最終確認サマリ後の「項目名指定の修正指示」(最小実装)
+    // 見積の最終確認サマリ後だけ、生成/修正指示に反応する（最小実装）
     if (!currentIntent && lastAiText?.startsWith('最終確認（見積）')) {
+      // 生成指示（例:「この内容で作って」「見積たたき台出して」）
+      if (isEstimateGenerateInstruction(trimmed)) {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: buildEstimateDraftMessage({
+            phase1: estimateCollected,
+            phase2: estimatePhase2Collected,
+            overrides: estimateOverrides,
+            selectedProjectName: selectedProject?.name,
+          }),
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+
+      // 修正指示（項目名指定）
       const edits = parseEstimateEditInstruction(trimmed)
       const keys = Object.keys(edits) as (keyof EstimateOverrides)[]
       const hasEdits = keys.some(k => !!edits[k])
