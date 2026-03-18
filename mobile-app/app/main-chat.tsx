@@ -416,16 +416,21 @@ type EstimateDraftLineItem = {
 }
 
 type EstimateDraftData = {
-  client: string
-  project: string
-  work: string
-  quantityUnit: string
-  dueDate: string
-  location: string
-  pricingPolicy: string
-  margin: string
-  notes: string
+  header: {
+    title: string
+    client: string
+    project: string
+  }
+  conditions: {
+    work: string
+    quantityUnit: string
+    dueDate: string
+    location: string
+    pricingPolicy: string
+    margin: string
+  }
   lineItems: EstimateDraftLineItem[]
+  notes: string
 }
 
 const buildEstimateDraftData = (params: {
@@ -466,32 +471,37 @@ const buildEstimateDraftData = (params: {
   }
 
   return {
-    client,
-    project,
-    work,
-    quantityUnit,
-    dueDate,
-    location,
-    pricingPolicy,
-    margin,
-    notes: '金額計算・正式な見積書出力（PDF/Excel）はまだ未対応です。',
+    header: {
+      title: '見積たたき台（ダミー）',
+      client,
+      project,
+    },
+    conditions: {
+      work,
+      quantityUnit,
+      dueDate,
+      location,
+      pricingPolicy,
+      margin,
+    },
     lineItems,
+    notes: '金額計算・正式な見積書出力（PDF/Excel）はまだ未対応です。',
   }
 }
 
 const buildEstimateDraftMessage = (data: EstimateDraftData) => {
   const lines: string[] = []
-  lines.push('見積たたき台（ダミー）')
-  lines.push(`宛名: ${data.client}`)
-  lines.push(`現場: ${data.project}`)
+  lines.push(data.header.title)
+  lines.push(`宛名: ${data.header.client}`)
+  lines.push(`現場: ${data.header.project}`)
   lines.push('')
   lines.push('【条件】')
-  lines.push(`・工事/作業内容: ${data.work}`)
-  lines.push(`・数量/単位: ${data.quantityUnit}`)
-  lines.push(`・希望納期: ${data.dueDate}`)
-  lines.push(`・現場住所: ${data.location}`)
-  lines.push(`・価格方針: ${data.pricingPolicy}`)
-  lines.push(`・希望粗利率: ${data.margin}`)
+  lines.push(`・工事/作業内容: ${data.conditions.work}`)
+  lines.push(`・数量/単位: ${data.conditions.quantityUnit}`)
+  lines.push(`・希望納期: ${data.conditions.dueDate}`)
+  lines.push(`・現場住所: ${data.conditions.location}`)
+  lines.push(`・価格方針: ${data.conditions.pricingPolicy}`)
+  lines.push(`・希望粗利率: ${data.conditions.margin}`)
   lines.push('')
   lines.push('【明細（仮）】')
   for (const item of data.lineItems) {
