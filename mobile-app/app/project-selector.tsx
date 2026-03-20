@@ -118,9 +118,18 @@ export default function ProjectSelectorScreen() {
                   <Text style={styles.projectName} numberOfLines={1}>
                     {p.name}
                   </Text>
-                  <Text style={styles.projectMeta} numberOfLines={1}>
-                    {p.address ? p.address : p.memo ? p.memo : '住所なし'}
-                  </Text>
+                  <View style={styles.projectRow}>
+                    <Text style={styles.projectMeta} numberOfLines={1}>
+                      {p.address ? p.address : p.memo ? p.memo : '住所なし'}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.projectExpensesButton}
+                      onPress={() => router.push({ pathname: '/project-expenses', params: { projectId: p.id } })}
+                      accessibilityLabel={`経費一覧: ${p.name}`}
+                    >
+                      <Text style={styles.projectExpensesButtonText}>経費</Text>
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -247,10 +256,29 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
   },
+  projectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: Spacing.sm,
+  },
   projectMeta: {
+    flex: 1,
     color: Colors.dark.text.secondary,
     fontSize: Typography.sizes.xs,
-    marginTop: 4,
+  },
+  projectExpensesButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.dark.background.tertiary,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.primary,
+  },
+  projectExpensesButtonText: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
   },
   divider: {
     height: 1,

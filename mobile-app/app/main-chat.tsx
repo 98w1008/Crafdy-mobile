@@ -13,6 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
 import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
+import { createExpense, ExpenseKind } from '@/lib/expense-store'
 
 interface Message {
   id: string
@@ -36,6 +37,13 @@ type ExpenseCollected = {
   whenWhereWhatConfirmed: boolean
   amountConfirmed: boolean
   paymentMethodConfirmed: boolean
+}
+
+type ExpenseDraft = {
+  kind?: ExpenseKind
+  amount?: number
+  memo?: string
+  date?: string // YYYY-MM-DD
 }
 
 type EstimateCollected = {
@@ -108,6 +116,8 @@ const defaultExpenseCollected: ExpenseCollected = {
   amountConfirmed: false,
   paymentMethodConfirmed: false,
 }
+
+const defaultExpenseDraft: ExpenseDraft = {}
 
 const defaultEstimateCollected: EstimateCollected = {
   workConfirmed: false,
@@ -397,6 +407,67 @@ const getLastAiText = (messages: Message[]) => {
     if (messages[i].sender === 'ai') return messages[i].text
   }
   return null
+}
+
+const parseExpenseKind = (text: string): ExpenseKind | undefined => {
+  if (/(レシート|領収書)/.test(text)) return 'receipt'
+  if (/(材料|部材)/.test(text)) return 'material'
+  if (/(外注|下請|協力会社)/.test(text)) return 'subcontract'
+  if (/(経費)/.test(text)) return 'expense'
+  return undefined
+}
+
+const parseExpenseAmount = (text: string): number | undefined => {
+  const m = text.match(/(?:¥|￥)?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:円)?/)
+  if (!m?.[1]) return undefined
+  const n = Number(m[1].replace(/,/g, ''))
+  if (!Number.isFinite(n) || n <= 0) return undefined
+  return n
+}
+
+const toYmd = (d: Date) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const parseExpenseDate = (text: string, now = new Date()): string | undefined => {
+  if (/(今日)/.test(text)) return toYmd(now)
+  if (/(昨日)/.test(text)) {
+    const d = new Date(now)
+    d.setDate(d.getDate() - 1)
+    return toYmd(d)
+  }
+
+  const slash = text.match(/(\d{1,2})\/(\d{1,2})/)
+  if (slash) {
+    const mm = Number(slash[1])
+    const dd = Number(slash[2])
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+      return `${now.getFullYear()}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
+    }
+  }
+
+  const jp = text.match(/(\d{1,2})月(\d{1,2})日/)
+  if (jp) {
+    const mm = Number(jp[1])
+    const dd = Number(jp[2])
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+      return `${now.getFullYear()}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
+    }
+  }
+
+  return undefined
+}
+
+const stripExpenseKeywords = (text: string) => {
+  return text
+    .replace(/(レシート|領収書|材料|部材|外注|下請|協力会社|経費)/g, '')
+    .replace(/(?:¥|￥)?\s*\d{1,3}(?:,\d{3})*\s*円?/g, '')
+    .replace(/(今日|昨日|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/g, '')
+    .replace(/[\s、,]+/g, ' ')
+    .trim()
 }
 
 const isEstimateGenerateInstruction = (text: string) => {
@@ -888,6 +959,8 @@ export default function SimpleChatScreen() {
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
   const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
+  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(defaultExpenseDraft)
+  const [isExpenseIntake, setIsExpenseIntake] = useState(false)
   const [estimateCollected, setEstimateCollected] = useState<EstimateCollected>(defaultEstimateCollected)
   const [estimatePhase1Values, setEstimatePhase1Values] = useState<EstimatePhase1Values>(defaultEstimatePhase1Values)
   const [estimatePhase, setEstimatePhase] = useState<EstimatePhase>(1)
@@ -1006,6 +1079,97 @@ export default function SimpleChatScreen() {
 
     setMessages(prev => [...prev, userMessage])
     setInputText('')
+
+    // 経費登録（現場に紐づけて保存）: 選択中の現場がある時だけ
+    if (selectedProject?.id) {
+      const kind = parseExpenseKind(trimmed)
+      const amount = parseExpenseAmount(trimmed)
+      const date = parseExpenseDate(trimmed)
+      const memo = stripExpenseKeywords(trimmed)
+
+      const isExpenseLike =
+        isExpenseIntake ||
+        !!kind ||
+        /\b¥|￥|円\b/.test(trimmed) ||
+        /(レシート|領収書|材料|外注|経費)/.test(trimmed)
+
+      if (isExpenseLike) {
+        const merged: ExpenseDraft = {
+          kind: kind ?? expenseDraft.kind,
+          amount: amount ?? expenseDraft.amount,
+          date: date ?? expenseDraft.date,
+          memo: memo || expenseDraft.memo,
+        }
+
+        const normalized: ExpenseDraft = {
+          kind: merged.kind,
+          amount: merged.amount,
+          date: merged.date ?? toYmd(new Date()),
+          memo: merged.memo ?? '',
+        }
+
+        // 不足があれば最小で1つだけ聞く
+        if (!normalized.amount) {
+          setExpenseDraft(normalized)
+          setIsExpenseIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `金額はいくらですか？（例：¥1200）`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        if (!normalized.kind) {
+          setExpenseDraft(normalized)
+          setIsExpenseIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `種別はどれですか？（レシート / 材料 / 外注 / 経費）`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        // memoが空でも保存は許可（最小）
+        const savedMemo = normalized.memo || '（メモなし）'
+
+        ;(async () => {
+          const saved = await createExpense({
+            projectId: selectedProject.id,
+            kind: normalized.kind!,
+            amount: normalized.amount!,
+            memo: savedMemo,
+            date: normalized.date!,
+          })
+
+          setExpenseDraft(defaultExpenseDraft)
+          setIsExpenseIntake(false)
+
+          const kindLabel =
+            saved.kind === 'receipt'
+              ? 'レシート'
+              : saved.kind === 'material'
+                ? '材料'
+                : saved.kind === 'subcontract'
+                  ? '外注'
+                  : '経費'
+
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `OK。[${selectedProject.name}] に ${kindLabel} ¥${saved.amount.toLocaleString('ja-JP')} を保存しました。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+        })()
+        return
+      }
+    }
 
     // 現場の住所/メモ更新（チャット編集）: 選択中の現場がある時だけ
     if (selectedProject?.id && (/(住所)/.test(trimmed) || /(メモ)/.test(trimmed))) {
