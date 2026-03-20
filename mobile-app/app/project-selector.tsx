@@ -129,6 +129,13 @@ export default function ProjectSelectorScreen() {
                     >
                       <Text style={styles.projectExpensesButtonText}>経費</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.projectExpensesButton}
+                      onPress={() => router.push({ pathname: '/project-daily-reports', params: { projectId: p.id } })}
+                      accessibilityLabel={`日報一覧: ${p.name}`}
+                    >
+                      <Text style={styles.projectExpensesButtonText}>日報</Text>
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               ))}

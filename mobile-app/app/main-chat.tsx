@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
 import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
 import { createExpense, ExpenseKind } from '@/lib/expense-store'
+import { createDailyReport } from '@/lib/daily-report-store'
 
 interface Message {
   id: string
@@ -44,6 +45,13 @@ type ExpenseDraft = {
   amount?: number
   memo?: string
   date?: string // YYYY-MM-DD
+}
+
+type DailyReportDraft = {
+  date?: string // YYYY-MM-DD
+  work?: string
+  workforceTime?: string
+  nextPlan?: string
 }
 
 type EstimateCollected = {
@@ -118,6 +126,7 @@ const defaultExpenseCollected: ExpenseCollected = {
 }
 
 const defaultExpenseDraft: ExpenseDraft = {}
+const defaultDailyReportDraft: DailyReportDraft = {}
 
 const defaultEstimateCollected: EstimateCollected = {
   workConfirmed: false,
@@ -468,6 +477,22 @@ const stripExpenseKeywords = (text: string) => {
     .replace(/(今日|昨日|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/g, '')
     .replace(/[\s、,]+/g, ' ')
     .trim()
+}
+
+const parseDailyReportWork = (text: string): string | undefined => {
+  if (!/(工事|作業|配管|塗装|防水|交換|取付|設置|撤去|補修)/.test(text)) return undefined
+  return text.trim()
+}
+
+const parseDailyReportWorkforceTime = (text: string): string | undefined => {
+  const m = text.match(/(\d+\s*(?:人|名))|((?:\d+(?:\.\d+)?)\s*h)|(半日|終日)/)
+  if (m?.[0]) return m[0].trim()
+  return undefined
+}
+
+const parseDailyReportNextPlan = (text: string): string | undefined => {
+  if (!/(明日|次回|続き|予定)/.test(text)) return undefined
+  return text.trim()
 }
 
 const isEstimateGenerateInstruction = (text: string) => {
@@ -961,6 +986,8 @@ export default function SimpleChatScreen() {
   const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(defaultExpenseDraft)
   const [isExpenseIntake, setIsExpenseIntake] = useState(false)
+  const [dailyReportDraft, setDailyReportDraft] = useState<DailyReportDraft>(defaultDailyReportDraft)
+  const [isDailyReportIntake, setIsDailyReportIntake] = useState(false)
   const [estimateCollected, setEstimateCollected] = useState<EstimateCollected>(defaultEstimateCollected)
   const [estimatePhase1Values, setEstimatePhase1Values] = useState<EstimatePhase1Values>(defaultEstimatePhase1Values)
   const [estimatePhase, setEstimatePhase] = useState<EstimatePhase>(1)
@@ -1079,6 +1106,99 @@ export default function SimpleChatScreen() {
 
     setMessages(prev => [...prev, userMessage])
     setInputText('')
+
+    // 日報登録（現場に紐づけて保存）: 選択中の現場がある時だけ
+    if (selectedProject?.id) {
+      const date = parseExpenseDate(trimmed)
+      const work = parseDailyReportWork(trimmed)
+      const workforceTime = parseDailyReportWorkforceTime(trimmed)
+      const nextPlan = parseDailyReportNextPlan(trimmed)
+
+      const isDailyReportLike =
+        isDailyReportIntake ||
+        /(日報)/.test(trimmed) ||
+        !!work ||
+        !!workforceTime ||
+        !!nextPlan ||
+        /(今日|昨日|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/.test(trimmed)
+
+      if (isDailyReportLike) {
+        const merged: DailyReportDraft = {
+          date: date ?? dailyReportDraft.date,
+          work: work ?? dailyReportDraft.work,
+          workforceTime: workforceTime ?? dailyReportDraft.workforceTime,
+          nextPlan: nextPlan ?? dailyReportDraft.nextPlan,
+        }
+
+        const normalized: DailyReportDraft = {
+          date: merged.date ?? toYmd(new Date()),
+          work: merged.work,
+          workforceTime: merged.workforceTime,
+          nextPlan: merged.nextPlan,
+        }
+
+        if (!normalized.work) {
+          setDailyReportDraft(normalized)
+          setIsDailyReportIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `今日の作業内容を教えてください（例：配管交換 / 塗装 / 防水など）。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        if (!normalized.workforceTime) {
+          setDailyReportDraft(normalized)
+          setIsDailyReportIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `人数/作業時間は？（例：2人 / 8h / 半日 / 終日）`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        if (!normalized.nextPlan) {
+          setDailyReportDraft(normalized)
+          setIsDailyReportIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `明日の予定は？（例：続き / 配管試験 / 材料搬入 など）`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        ;(async () => {
+          const saved = await createDailyReport({
+            projectId: selectedProject.id,
+            date: normalized.date!,
+            work: normalized.work!,
+            workforceTime: normalized.workforceTime!,
+            nextPlan: normalized.nextPlan!,
+          })
+
+          setDailyReportDraft(defaultDailyReportDraft)
+          setIsDailyReportIntake(false)
+
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+        })()
+        return
+      }
+    }
 
     // 経費登録（現場に紐づけて保存）: 選択中の現場がある時だけ
     if (selectedProject?.id) {
