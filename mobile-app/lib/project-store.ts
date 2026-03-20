@@ -5,6 +5,7 @@ export type StoredProject = {
   name: string
   address?: string
   memo?: string
+  revenue?: number // 見込み売上（円）
   createdAt: string
 }
 
@@ -58,6 +59,7 @@ export const updateProject = async (params: {
   id: string
   address?: string
   memo?: string
+  revenue?: number
 }): Promise<StoredProject | null> => {
   const projects = await listProjects()
   const idx = projects.findIndex(p => p.id === params.id)
@@ -68,6 +70,7 @@ export const updateProject = async (params: {
     ...prev,
     address: params.address !== undefined ? (params.address.trim() || undefined) : prev.address,
     memo: params.memo !== undefined ? (params.memo.trim() || undefined) : prev.memo,
+    revenue: params.revenue !== undefined ? (Number.isFinite(params.revenue) ? params.revenue : prev.revenue) : prev.revenue,
   }
 
   const nextProjects = [...projects]

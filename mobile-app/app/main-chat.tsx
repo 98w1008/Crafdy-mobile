@@ -434,6 +434,20 @@ const parseExpenseAmount = (text: string): number | undefined => {
   return n
 }
 
+const parseRevenueAmount = (text: string): number | undefined => {
+  // 例: 80万 / 80万円 / 1.2万
+  const man = text.match(/(\d+(?:\.\d+)?)\s*万(?:円)?/)
+  if (man?.[1]) {
+    const v = Number(man[1])
+    const n = Math.round(v * 10000)
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    return n
+  }
+
+  // 例: 1200000円 / ¥1,200,000
+  return parseExpenseAmount(text)
+}
+
 const toYmd = (d: Date) => {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -1106,6 +1120,47 @@ export default function SimpleChatScreen() {
 
     setMessages(prev => [...prev, userMessage])
     setInputText('')
+
+    // 現場の売上（見込み売上）更新: 選択中の現場がある時だけ
+    if (selectedProject?.id) {
+      const isRevenueKeyword = /(売上|売り上げ|請負金額|受注金額|見込み売上)/.test(trimmed)
+      if (isRevenueKeyword) {
+        const amount = parseRevenueAmount(trimmed)
+        if (amount) {
+          ;(async () => {
+            const updated = await updateProject({ id: selectedProject.id, revenue: amount })
+            if (!updated) {
+              const aiMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                text: `更新に失敗しました（現場が見つかりません）。現場を選び直してください。`,
+                sender: 'ai',
+                timestamp: new Date(),
+              }
+              setMessages(prev => [...prev, aiMessage])
+              return
+            }
+
+            const aiMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              text: `OK。[${selectedProject.name}] の売上を ¥${amount.toLocaleString('ja-JP')} に設定しました。`,
+              sender: 'ai',
+              timestamp: new Date(),
+            }
+            setMessages(prev => [...prev, aiMessage])
+          })()
+          return
+        }
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `売上の金額が分かりませんでした。例：「この現場の売上は80万円」「請負金額1200000円で」`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+    }
 
     // 日報登録（現場に紐づけて保存）: 選択中の現場がある時だけ
     if (selectedProject?.id) {

@@ -46,10 +46,12 @@ interface QuickAction {
 type ProjectKpi = {
   projectId: string
   projectName: string
+  revenue: number | null
   expenseTotal: number
+  grossProfit: number | null
+  grossProfitRate: number | null
   dailyReportCount: number
   latestWork: string | null
-  grossProfitNote: string
 }
 
 export default function DashboardTab() {
@@ -92,13 +94,20 @@ export default function DashboardTab() {
       const reports = (reportsByProject.get(p.id) ?? []).slice().sort((a, b) => b.date.localeCompare(a.date))
       const latest = reports[0]
 
+      const revenue = Number.isFinite(p.revenue) ? (p.revenue as number) : null
+      const grossProfit = revenue !== null ? revenue - projectExpenses : null
+      const grossProfitRate =
+        revenue !== null && revenue > 0 ? Math.round((grossProfit! / revenue) * 1000) / 10 : null
+
       return {
         projectId: p.id,
         projectName: p.name,
+        revenue,
         expenseTotal: projectExpenses,
+        grossProfit,
+        grossProfitRate,
         dailyReportCount: reports.length,
         latestWork: latest?.work ?? null,
-        grossProfitNote: '売上未設定（粗利計算には売上入力が必要）',
       }
     })
   }, [projects, expenses, dailyReports])
@@ -331,8 +340,8 @@ export default function DashboardTab() {
   const renderProjectKpis = () => (
     <Card variant="elevated" style={styles.projectKpiCard}>
       <View style={styles.projectKpiHeader}>
-        <StyledText variant="subtitle" weight="semibold">現場別（粗利/進捗の最小）</StyledText>
-        <StyledText variant="caption" color="secondary">経費と日報から集計（売上は未設定）</StyledText>
+        <StyledText variant="subtitle" weight="semibold">現場別（売上/経費/粗利）</StyledText>
+        <StyledText variant="caption" color="secondary">経費と日報から集計（売上は main-chat から設定）</StyledText>
       </View>
 
       {projectKpis.length === 0 ? (
@@ -348,10 +357,24 @@ export default function DashboardTab() {
                 <StyledText variant="caption" color="secondary" numberOfLines={1}>
                   日報{kpi.dailyReportCount}件 / 最新: {kpi.latestWork ?? 'なし'}
                 </StyledText>
+                <StyledText variant="caption" color="secondary" numberOfLines={1}>
+                  経費: ¥{kpi.expenseTotal.toLocaleString('ja-JP')}
+                  {kpi.grossProfit !== null ? ` / 粗利: ¥${kpi.grossProfit.toLocaleString('ja-JP')}` : ''}
+                  {kpi.grossProfitRate !== null ? `（${kpi.grossProfitRate}%）` : ''}
+                </StyledText>
               </View>
               <View style={styles.projectKpiRight}>
-                <StyledText variant="body" weight="semibold">¥{kpi.expenseTotal.toLocaleString('ja-JP')}</StyledText>
-                <StyledText variant="caption" color="secondary">経費合計</StyledText>
+                {kpi.revenue === null ? (
+                  <>
+                    <StyledText variant="body" weight="semibold">売上未設定</StyledText>
+                    <StyledText variant="caption" color="secondary">main-chatで設定</StyledText>
+                  </>
+                ) : (
+                  <>
+                    <StyledText variant="body" weight="semibold">¥{kpi.revenue.toLocaleString('ja-JP')}</StyledText>
+                    <StyledText variant="caption" color="secondary">売上</StyledText>
+                  </>
+                )}
               </View>
             </View>
           ))}
@@ -359,7 +382,7 @@ export default function DashboardTab() {
       )}
 
       <View style={{ marginTop: Spacing.sm }}>
-        <StyledText variant="caption" color="secondary">粗利: 売上未設定（粗利計算には売上入力が必要）</StyledText>
+        <StyledText variant="caption" color="secondary">※ 売上未設定の現場は main-chat から売上を設定してください。</StyledText>
       </View>
     </Card>
   )
