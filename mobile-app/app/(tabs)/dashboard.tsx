@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   View,
   StyleSheet,
@@ -11,6 +11,9 @@ import { router } from 'expo-router'
 import { useAuth, useRole } from '@/contexts/AuthContext'
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
+import { listProjects, StoredProject } from '@/lib/project-store'
+import { listExpenses, StoredExpense } from '@/lib/expense-store'
+import { listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
 
 interface DashboardMetric {
   id: string
@@ -40,10 +43,65 @@ interface QuickAction {
   route: string
 }
 
+type ProjectKpi = {
+  projectId: string
+  projectName: string
+  expenseTotal: number
+  dailyReportCount: number
+  latestWork: string | null
+  grossProfitNote: string
+}
+
 export default function DashboardTab() {
   const { user, profile } = useAuth()
   const userRole = useRole()
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month')
+
+  const [projects, setProjects] = useState<StoredProject[]>([])
+  const [expenses, setExpenses] = useState<StoredExpense[]>([])
+  const [dailyReports, setDailyReports] = useState<StoredDailyReport[]>([])
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const [p, e, r] = await Promise.all([listProjects(), listExpenses(), listDailyReports()])
+        setProjects(p)
+        setExpenses(e)
+        setDailyReports(r)
+      } catch (err) {
+        console.error('Failed to load dashboard data', err)
+      }
+    })()
+  }, [])
+
+  const projectKpis: ProjectKpi[] = useMemo(() => {
+    const expenseByProject = new Map<string, number>()
+    for (const e of expenses) {
+      expenseByProject.set(e.projectId, (expenseByProject.get(e.projectId) ?? 0) + (e.amount ?? 0))
+    }
+
+    const reportsByProject = new Map<string, StoredDailyReport[]>()
+    for (const r of dailyReports) {
+      const arr = reportsByProject.get(r.projectId) ?? []
+      arr.push(r)
+      reportsByProject.set(r.projectId, arr)
+    }
+
+    return projects.map(p => {
+      const projectExpenses = expenseByProject.get(p.id) ?? 0
+      const reports = (reportsByProject.get(p.id) ?? []).slice().sort((a, b) => b.date.localeCompare(a.date))
+      const latest = reports[0]
+
+      return {
+        projectId: p.id,
+        projectName: p.name,
+        expenseTotal: projectExpenses,
+        dailyReportCount: reports.length,
+        latestWork: latest?.work ?? null,
+        grossProfitNote: '売上未設定（粗利計算には売上入力が必要）',
+      }
+    })
+  }, [projects, expenses, dailyReports])
 
   // 建設業界特化ダッシュボードメトリクス（親方用）
   const dashboardMetrics: DashboardMetric[] = [
@@ -270,6 +328,42 @@ export default function DashboardTab() {
     </Card>
   )
 
+  const renderProjectKpis = () => (
+    <Card variant="elevated" style={styles.projectKpiCard}>
+      <View style={styles.projectKpiHeader}>
+        <StyledText variant="subtitle" weight="semibold">現場別（粗利/進捗の最小）</StyledText>
+        <StyledText variant="caption" color="secondary">経費と日報から集計（売上は未設定）</StyledText>
+      </View>
+
+      {projectKpis.length === 0 ? (
+        <StyledText variant="body" color="secondary">現場がまだありません。main-chat から現場を作成してください。</StyledText>
+      ) : (
+        <View style={styles.projectKpiList}>
+          {projectKpis.map(kpi => (
+            <View key={kpi.projectId} style={styles.projectKpiItem}>
+              <View style={{ flex: 1 }}>
+                <StyledText variant="body" weight="semibold" numberOfLines={1}>
+                  {kpi.projectName}
+                </StyledText>
+                <StyledText variant="caption" color="secondary" numberOfLines={1}>
+                  日報{kpi.dailyReportCount}件 / 最新: {kpi.latestWork ?? 'なし'}
+                </StyledText>
+              </View>
+              <View style={styles.projectKpiRight}>
+                <StyledText variant="body" weight="semibold">¥{kpi.expenseTotal.toLocaleString('ja-JP')}</StyledText>
+                <StyledText variant="caption" color="secondary">経費合計</StyledText>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={{ marginTop: Spacing.sm }}>
+        <StyledText variant="caption" color="secondary">粗利: 売上未設定（粗利計算には売上入力が必要）</StyledText>
+      </View>
+    </Card>
+  )
+
   const renderMetricsGrid = () => (
     <View style={styles.metricsGrid}>
       {dashboardMetrics.map((metric) => (
@@ -443,6 +537,9 @@ export default function DashboardTab() {
         {/* ウェルカムカード */}
         {renderWelcomeCard()}
 
+        {/* 現場別（粗利/進捗の最小） */}
+        {renderProjectKpis()}
+
         {/* メトリクスグリッド */}
         {renderMetricsGrid()}
 
@@ -474,6 +571,29 @@ const styles = StyleSheet.create({
   },
   welcomeCard: {
     marginBottom: Spacing.lg,
+  },
+  projectKpiCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  projectKpiHeader: {
+    marginBottom: Spacing.sm,
+    gap: 2,
+  },
+  projectKpiList: {
+    gap: Spacing.sm,
+  },
+  projectKpiItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  projectKpiRight: {
+    alignItems: 'flex-end',
+    minWidth: 96,
   },
   welcomeContent: {
     flexDirection: 'row',
