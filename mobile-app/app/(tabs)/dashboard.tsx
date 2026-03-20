@@ -52,6 +52,7 @@ type ProjectKpi = {
   grossProfitRate: number | null
   dailyReportCount: number
   latestWork: string | null
+  inputStatus: string
 }
 
 export default function DashboardTab() {
@@ -108,6 +109,14 @@ export default function DashboardTab() {
       const grossProfitRate =
         revenue !== null && revenue > 0 ? Math.round((grossProfit! / revenue) * 1000) / 10 : null
 
+      const inputNotes: string[] = []
+      if (revenue === null) inputNotes.push('売上未設定')
+      if (projectExpenses <= 0) inputNotes.push('経費0件')
+      if (reports.length === 0) inputNotes.push('日報0件')
+      if (reports.length > 0 && !(latest?.nextPlan || '').trim()) inputNotes.push('最新日報: 明日の予定なし')
+
+      const inputStatus = inputNotes.length === 0 ? '入力状況: OK' : `要確認: ${inputNotes.join(' / ')}`
+
       return {
         projectId: p.id,
         projectName: p.name,
@@ -117,6 +126,7 @@ export default function DashboardTab() {
         grossProfitRate,
         dailyReportCount: reports.length,
         latestWork: latest?.work ?? null,
+        inputStatus,
       }
     })
   }, [projects, expenses, dailyReports])
@@ -370,6 +380,9 @@ export default function DashboardTab() {
                   経費: ¥{kpi.expenseTotal.toLocaleString('ja-JP')}
                   {kpi.grossProfit !== null ? ` / 粗利: ¥${kpi.grossProfit.toLocaleString('ja-JP')}` : ''}
                   {kpi.grossProfitRate !== null ? `（${kpi.grossProfitRate}%）` : ''}
+                </StyledText>
+                <StyledText variant="caption" color="secondary" numberOfLines={1}>
+                  {kpi.inputStatus}
                 </StyledText>
               </View>
               <View style={styles.projectKpiRight}>
