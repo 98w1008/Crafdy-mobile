@@ -9,10 +9,10 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Modal,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
+import { getSelectedProject, setSelectedProject } from '@/lib/project-store'
 
 interface Message {
   id: string
@@ -882,8 +882,7 @@ export default function SimpleChatScreen() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
-  const [selectedProject, setSelectedProject] = useState<SelectedProject>(null) // TODO: AsyncStorage/Contextと連携
-  const [showProjectSelector, setShowProjectSelector] = useState(false)
+  const [selectedProject, setSelectedProjectState] = useState<SelectedProject>(null)
 
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
@@ -899,7 +898,12 @@ export default function SimpleChatScreen() {
   const [dailyReportCollected, setDailyReportCollected] = useState<DailyReportCollected>(defaultDailyReportCollected)
   const [invoiceCollected, setInvoiceCollected] = useState<InvoiceCollected>(defaultInvoiceCollected)
 
-  const { newProjectId, newProjectName } = useLocalSearchParams<{ newProjectId: string; newProjectName: string }>()
+  const { newProjectId, newProjectName, selectedProjectId, selectedProjectName } = useLocalSearchParams<{
+    newProjectId?: string
+    newProjectName?: string
+    selectedProjectId?: string
+    selectedProjectName?: string
+  }>()
 
   const emptyQuickActions: EmptyQuickAction[] = [
     {
@@ -924,12 +928,37 @@ export default function SimpleChatScreen() {
     },
   ]
 
-  // 新規作成された現場の自動選択
+  const selectProject = async (project: { id: string; name: string } | null) => {
+    setSelectedProjectState(project)
+    await setSelectedProject(project)
+  }
+
+  // 保存済みの現場を復元（初回起動/復帰用）
+  useEffect(() => {
+    if (selectedProject) return
+    if (newProjectId || selectedProjectId) return
+
+    ;(async () => {
+      const saved = await getSelectedProject()
+      if (saved?.id && saved?.name) {
+        setSelectedProjectState({ id: saved.id, name: saved.name })
+      }
+    })()
+  }, [selectedProject, newProjectId, selectedProjectId])
+
+  // 選択された現場の反映（一覧から選んだ時）
+  useEffect(() => {
+    if (selectedProjectId && selectedProjectName) {
+      selectProject({ id: selectedProjectId, name: selectedProjectName })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId, selectedProjectName])
+
+  // 新規作成された現場の自動選択（作成直後の歓迎だけ出す）
   useEffect(() => {
     if (newProjectId && newProjectName) {
-      setSelectedProject({ id: newProjectId, name: newProjectName })
+      selectProject({ id: newProjectId, name: newProjectName })
 
-      // AIからの歓迎メッセージを追加
       const welcomeMessage: Message = {
         id: `welcome-${Date.now()}`,
         text: `[${newProjectName}] を作成しました。続けて依頼を書いてください（例：日報/見積/請求書）。`,
@@ -938,23 +967,11 @@ export default function SimpleChatScreen() {
       }
       setMessages(prev => [...prev, welcomeMessage])
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newProjectId, newProjectName])
 
-  // ダミーのプロジェクトリスト（TODO: 実際のAPIから取得）
-  const dummyProjects = [
-    { id: '1', name: '○○ビル新築工事', location: '東京都' },
-    { id: '2', name: '△△アパート改修', location: '神奈川県' },
-  ]
-
-  const handleSelectProject = (projectId: string, projectName: string) => {
-    setSelectedProject({ id: projectId, name: projectName })
-    setShowProjectSelector(false)
-    // TODO: AsyncStorageに保存
-  }
-
-  const handleCreateNewProject = () => {
-    setShowProjectSelector(false)
-    router.push('/project-create')
+  const openProjectSelector = () => {
+    router.push('/project-selector')
   }
 
   const handleSend = () => {
@@ -1340,7 +1357,7 @@ export default function SimpleChatScreen() {
   const isEmpty = messages.length === 0
 
   const handleProjectButton = () => {
-    setShowProjectSelector(true)
+    openProjectSelector()
   }
 
   const handleEmptyQuickAction = (action: EmptyQuickAction) => {
@@ -1434,44 +1451,6 @@ export default function SimpleChatScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 現場選択モーダル */}
-        <Modal
-          visible={showProjectSelector}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowProjectSelector(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>現場を選択</Text>
-                <TouchableOpacity onPress={() => setShowProjectSelector(false)}>
-                  <Text style={styles.modalClose}>×</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={styles.projectList}>
-                {dummyProjects.map(project => (
-                  <TouchableOpacity
-                    key={project.id}
-                    style={styles.projectItem}
-                    onPress={() => handleSelectProject(project.id, project.name)}
-                  >
-                    <Text style={styles.projectName}>{project.name}</Text>
-                    <Text style={styles.projectLocation}>{project.location}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <TouchableOpacity
-                style={styles.createProjectButton}
-                onPress={handleCreateNewProject}
-              >
-                <Text style={styles.createProjectButtonText}>＋ 現場を作成</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
