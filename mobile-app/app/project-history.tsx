@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, StyleSheet } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { getProjectById } from '@/lib/project-store'
@@ -47,31 +47,40 @@ export default function ProjectHistoryScreen() {
   const [expenses, setExpenses] = useState<StoredExpense[]>([])
   const [reports, setReports] = useState<StoredDailyReport[]>([])
 
-  useEffect(() => {
-    ;(async () => {
-      if (!projectId) return
-      setLoading(true)
-      setProjectMissing(false)
-      try {
-        const p = await getProjectById(projectId)
-        if (!p) {
-          setProjectName('')
-          setProjectMissing(true)
-          setExpenses([])
-          setReports([])
-          return
-        }
-
-        setProjectName(p.name)
-
-        const [e, r] = await Promise.all([listExpensesByProject(projectId), listDailyReportsByProject(projectId)])
-        setExpenses(e)
-        setReports(r)
-      } finally {
-        setLoading(false)
+  const reload = async () => {
+    if (!projectId) return
+    setLoading(true)
+    setProjectMissing(false)
+    try {
+      const p = await getProjectById(projectId)
+      if (!p) {
+        setProjectName('')
+        setProjectMissing(true)
+        setExpenses([])
+        setReports([])
+        return
       }
-    })()
+
+      setProjectName(p.name)
+
+      const [e, r] = await Promise.all([listExpensesByProject(projectId), listDailyReportsByProject(projectId)])
+      setExpenses(e)
+      setReports(r)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      reload()
+    }, [projectId])
+  )
 
   const toCreatedAtMs = (createdAt?: string) => {
     if (!createdAt) return 0

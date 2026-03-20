@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { useAuth, useRole } from '@/contexts/AuthContext'
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
@@ -63,18 +63,27 @@ export default function DashboardTab() {
   const [expenses, setExpenses] = useState<StoredExpense[]>([])
   const [dailyReports, setDailyReports] = useState<StoredDailyReport[]>([])
 
+  const reload = async () => {
+    try {
+      const [p, e, r] = await Promise.all([listProjects(), listExpenses(), listDailyReports()])
+      setProjects(p)
+      setExpenses(e)
+      setDailyReports(r)
+    } catch (err) {
+      console.error('Failed to load dashboard data', err)
+    }
+  }
+
   useEffect(() => {
-    ;(async () => {
-      try {
-        const [p, e, r] = await Promise.all([listProjects(), listExpenses(), listDailyReports()])
-        setProjects(p)
-        setExpenses(e)
-        setDailyReports(r)
-      } catch (err) {
-        console.error('Failed to load dashboard data', err)
-      }
-    })()
+    reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      reload()
+    }, [])
+  )
 
   const projectKpis: ProjectKpi[] = useMemo(() => {
     const expenseByProject = new Map<string, number>()

@@ -993,7 +993,7 @@ export default function SimpleChatScreen() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [selectedProject, setSelectedProjectState] = useState<SelectedProject>(null)
-  const [selectedProjectDetails, setSelectedProjectDetails] = useState<{ address?: string; memo?: string } | null>(null)
+  const [selectedProjectDetails, setSelectedProjectDetails] = useState<{ address?: string; memo?: string; revenue?: number } | null>(null)
 
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
@@ -1098,7 +1098,7 @@ export default function SimpleChatScreen() {
 
     ;(async () => {
       const p = await getProjectById(selectedProject.id)
-      setSelectedProjectDetails(p ? { address: p.address, memo: p.memo } : null)
+      setSelectedProjectDetails(p ? { address: p.address, memo: p.memo, revenue: p.revenue } : null)
     })()
   }, [selectedProject?.id])
 
@@ -1139,6 +1139,8 @@ export default function SimpleChatScreen() {
               setMessages(prev => [...prev, aiMessage])
               return
             }
+
+            setSelectedProjectDetails(prev => ({ ...prev, revenue: updated.revenue }))
 
             const aiMessage: Message = {
               id: (Date.now() + 1).toString(),
@@ -1780,7 +1782,12 @@ export default function SimpleChatScreen() {
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Crafdy</Text>
             <Text style={styles.headerSubtitle}>
-              現場: {selectedProject ? selectedProject.name : '未選択'}
+              現場: {selectedProject ? selectedProject.name : '未選択（右の「現場」から選択/作成）'}
+              {selectedProject && selectedProjectDetails?.revenue
+                ? ` / 売上: ¥${selectedProjectDetails.revenue.toLocaleString('ja-JP')}`
+                : selectedProject
+                  ? ' / 売上: 未設定'
+                  : ''}
               {selectedProject && selectedProjectDetails?.address ? ` / 住所: ${selectedProjectDetails.address}` : ''}
             </Text>
           </View>

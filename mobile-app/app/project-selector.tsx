@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { createProject, listProjects, setSelectedProject, StoredProject } from '@/lib/project-store'
@@ -41,6 +41,12 @@ export default function ProjectSelectorScreen() {
   useEffect(() => {
     reload()
   }, [])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      reload()
+    }, [])
+  )
 
   const backToMainChatSelected = (p: Pick<StoredProject, 'id' | 'name'>) => {
     router.replace({

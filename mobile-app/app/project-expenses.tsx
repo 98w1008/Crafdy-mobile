@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, StyleSheet } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { listExpensesByProject, StoredExpense } from '@/lib/expense-store'
@@ -26,6 +26,12 @@ export default function ProjectExpensesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
 
+  useFocusEffect(
+    React.useCallback(() => {
+      reload()
+    }, [projectId])
+  )
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -46,7 +52,9 @@ export default function ProjectExpensesScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 24 }}>
-        {expenses.length === 0 ? (
+        {!projectId ? (
+          <Text style={styles.muted}>現場が指定されていません。現場一覧から開き直してください。</Text>
+        ) : expenses.length === 0 ? (
           <Text style={styles.muted}>まだ経費がありません。main-chat から登録してください。</Text>
         ) : (
           <View style={styles.list}>
