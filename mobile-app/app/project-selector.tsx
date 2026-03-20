@@ -122,20 +122,29 @@ export default function ProjectSelectorScreen() {
                     <Text style={styles.projectMeta} numberOfLines={1}>
                       {p.address ? p.address : p.memo ? p.memo : '住所なし'}
                     </Text>
-                    <TouchableOpacity
-                      style={styles.projectExpensesButton}
-                      onPress={() => router.push({ pathname: '/project-expenses', params: { projectId: p.id } })}
-                      accessibilityLabel={`経費一覧: ${p.name}`}
-                    >
-                      <Text style={styles.projectExpensesButtonText}>経費</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.projectExpensesButton}
-                      onPress={() => router.push({ pathname: '/project-daily-reports', params: { projectId: p.id } })}
-                      accessibilityLabel={`日報一覧: ${p.name}`}
-                    >
-                      <Text style={styles.projectExpensesButtonText}>日報</Text>
-                    </TouchableOpacity>
+                    <View style={styles.projectButtonsRow}>
+                      <TouchableOpacity
+                        style={styles.projectExpensesButton}
+                        onPress={() => router.push({ pathname: '/project-expenses', params: { projectId: p.id } })}
+                        accessibilityLabel={`経費一覧: ${p.name}`}
+                      >
+                        <Text style={styles.projectExpensesButtonText}>経費</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.projectExpensesButton}
+                        onPress={() => router.push({ pathname: '/project-daily-reports', params: { projectId: p.id } })}
+                        accessibilityLabel={`日報一覧: ${p.name}`}
+                      >
+                        <Text style={styles.projectExpensesButtonText}>日報</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.projectExpensesButton}
+                        onPress={() => router.push({ pathname: '/project-history', params: { projectId: p.id } })}
+                        accessibilityLabel={`履歴: ${p.name}`}
+                      >
+                        <Text style={styles.projectExpensesButtonText}>履歴</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -264,19 +273,21 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
   },
   projectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: 4,
-    gap: Spacing.sm,
+    gap: 6,
   },
   projectMeta: {
-    flex: 1,
     color: Colors.dark.text.secondary,
     fontSize: Typography.sizes.xs,
   },
+  projectButtonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   projectExpensesButton: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.dark.background.tertiary,
     borderWidth: 1,
