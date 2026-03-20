@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
-import { getSelectedProject, setSelectedProject } from '@/lib/project-store'
+import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
 
 interface Message {
   id: string
@@ -883,6 +883,7 @@ export default function SimpleChatScreen() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [selectedProject, setSelectedProjectState] = useState<SelectedProject>(null)
+  const [selectedProjectDetails, setSelectedProjectDetails] = useState<{ address?: string; memo?: string } | null>(null)
 
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
@@ -974,6 +975,19 @@ export default function SimpleChatScreen() {
     router.push('/project-selector')
   }
 
+  // 選択中の現場の詳細（住所/メモ）をロード
+  useEffect(() => {
+    if (!selectedProject?.id) {
+      setSelectedProjectDetails(null)
+      return
+    }
+
+    ;(async () => {
+      const p = await getProjectById(selectedProject.id)
+      setSelectedProjectDetails(p ? { address: p.address, memo: p.memo } : null)
+    })()
+  }, [selectedProject?.id])
+
   const handleSend = () => {
     const trimmed = inputText.trim()
     if (!trimmed) return
@@ -992,6 +1006,57 @@ export default function SimpleChatScreen() {
 
     setMessages(prev => [...prev, userMessage])
     setInputText('')
+
+    // 現場の住所/メモ更新（チャット編集）: 選択中の現場がある時だけ
+    if (selectedProject?.id && (/(住所)/.test(trimmed) || /(メモ)/.test(trimmed))) {
+      const nextAddress = (() => {
+        if (!/(住所)/.test(trimmed)) return undefined
+        const m = trimmed.match(/住所(?:を|は)?\s*(?:.*?)(?:変更|更新|修正|に|：|:)?\s*([^\n]+)$/)
+        return (m?.[1] || '').trim() || undefined
+      })()
+
+      const nextMemo = (() => {
+        if (!/(メモ)/.test(trimmed)) return undefined
+        const m = trimmed.match(/メモ(?:に|を|は)?\s*(?:.*?)(?:追記|追加|変更|更新|修正|：|:)?\s*([^\n]+)$/)
+        return (m?.[1] || '').trim() || undefined
+      })()
+
+      if (nextAddress || nextMemo) {
+        ;(async () => {
+          const updated = await updateProject({
+            id: selectedProject.id,
+            address: nextAddress,
+            memo: nextMemo,
+          })
+
+          if (!updated) {
+            const aiMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              text: `更新に失敗しました（現場が見つかりません）。現場を選び直してください。`,
+              sender: 'ai',
+              timestamp: new Date(),
+            }
+            setMessages(prev => [...prev, aiMessage])
+            return
+          }
+
+          setSelectedProjectDetails({ address: updated.address, memo: updated.memo })
+
+          const updatedFields: string[] = []
+          if (nextAddress) updatedFields.push('住所')
+          if (nextMemo) updatedFields.push('メモ')
+
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `OK。[${selectedProject.name}] の${updatedFields.join(' / ')}を更新しました。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+        })()
+        return
+      }
+    }
 
     // 見積の最終確認サマリ後だけ、生成/修正指示に反応する（最小実装）
     if (!currentIntent && lastAiText?.startsWith('最終確認（見積）')) {
@@ -1377,6 +1442,7 @@ export default function SimpleChatScreen() {
             <Text style={styles.headerTitle}>Crafdy</Text>
             <Text style={styles.headerSubtitle}>
               現場: {selectedProject ? selectedProject.name : '未選択'}
+              {selectedProject && selectedProjectDetails?.address ? ` / 住所: ${selectedProjectDetails.address}` : ''}
             </Text>
           </View>
           <TouchableOpacity style={styles.headerProjectButton} onPress={handleProjectButton}>

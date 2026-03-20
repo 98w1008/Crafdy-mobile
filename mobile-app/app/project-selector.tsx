@@ -119,7 +119,7 @@ export default function ProjectSelectorScreen() {
                     {p.name}
                   </Text>
                   <Text style={styles.projectMeta} numberOfLines={1}>
-                    {p.address ? p.address : '住所なし'}
+                    {p.address ? p.address : p.memo ? p.memo : '住所なし'}
                   </Text>
                 </TouchableOpacity>
               ))}

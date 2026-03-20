@@ -25,6 +25,11 @@ export const listProjects = async (): Promise<StoredProject[]> => {
   return safeParse<StoredProject[]>(raw, [])
 }
 
+export const getProjectById = async (id: string): Promise<StoredProject | null> => {
+  const projects = await listProjects()
+  return projects.find(p => p.id === id) ?? null
+}
+
 export const saveProjects = async (projects: StoredProject[]) => {
   await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(projects))
 }
@@ -47,6 +52,28 @@ export const createProject = async (params: {
   await saveProjects([project, ...projects])
   await setSelectedProject(project)
   return project
+}
+
+export const updateProject = async (params: {
+  id: string
+  address?: string
+  memo?: string
+}): Promise<StoredProject | null> => {
+  const projects = await listProjects()
+  const idx = projects.findIndex(p => p.id === params.id)
+  if (idx === -1) return null
+
+  const prev = projects[idx]
+  const next: StoredProject = {
+    ...prev,
+    address: params.address !== undefined ? (params.address.trim() || undefined) : prev.address,
+    memo: params.memo !== undefined ? (params.memo.trim() || undefined) : prev.memo,
+  }
+
+  const nextProjects = [...projects]
+  nextProjects[idx] = next
+  await saveProjects(nextProjects)
+  return next
 }
 
 export const setSelectedProject = async (project: Pick<StoredProject, 'id' | 'name'> | null) => {
