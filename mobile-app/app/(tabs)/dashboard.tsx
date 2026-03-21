@@ -66,6 +66,8 @@ export default function DashboardTab() {
   const [dailyReports, setDailyReports] = useState<StoredDailyReport[]>([])
 
   const [access, setAccess] = useState<AccessContext | null>(null)
+  const isUnassigned = access?.kind === 'unassigned'
+  const isOwner = access?.kind === 'assigned' ? access.role === 'owner' : true
 
   const reload = async () => {
     try {
@@ -367,7 +369,7 @@ export default function DashboardTab() {
   )
 
   const renderJoinByCodeCard = () => {
-    if (access?.kind !== 'unassigned') return null
+    if (!isUnassigned) return null
 
     return (
       <Card variant="elevated" style={styles.joinCard}>
@@ -389,8 +391,12 @@ export default function DashboardTab() {
   const renderProjectKpis = () => (
     <Card variant="elevated" style={styles.projectKpiCard}>
       <View style={styles.projectKpiHeader}>
-        <StyledText variant="subtitle" weight="semibold">現場別（売上/経費/粗利）</StyledText>
-        <StyledText variant="caption" color="secondary">経費と日報から集計（売上は main-chat から設定）</StyledText>
+        <StyledText variant="subtitle" weight="semibold">
+          {isOwner ? '現場別（売上/経費/粗利）' : '現場別（経費/日報）'}
+        </StyledText>
+        <StyledText variant="caption" color="secondary">
+          {isOwner ? '経費と日報から集計（売上は main-chat から設定）' : '経費と日報から集計'}
+        </StyledText>
       </View>
 
       {projectKpis.length === 0 ? (
@@ -408,23 +414,30 @@ export default function DashboardTab() {
                 </StyledText>
                 <StyledText variant="caption" color="secondary" numberOfLines={1}>
                   経費: ¥{kpi.expenseTotal.toLocaleString('ja-JP')}
-                  {kpi.grossProfit !== null ? ` / 粗利: ¥${kpi.grossProfit.toLocaleString('ja-JP')}` : ''}
-                  {kpi.grossProfitRate !== null ? `（${kpi.grossProfitRate}%）` : ''}
+                  {isOwner && kpi.grossProfit !== null ? ` / 粗利: ¥${kpi.grossProfit.toLocaleString('ja-JP')}` : ''}
+                  {isOwner && kpi.grossProfitRate !== null ? `（${kpi.grossProfitRate}%）` : ''}
                 </StyledText>
                 <StyledText variant="caption" color="secondary" numberOfLines={1}>
                   {kpi.inputStatus}
                 </StyledText>
               </View>
               <View style={styles.projectKpiRight}>
-                {kpi.revenue === null ? (
-                  <>
-                    <StyledText variant="body" weight="semibold">売上未設定</StyledText>
-                    <StyledText variant="caption" color="secondary">main-chatで設定</StyledText>
-                  </>
+                {isOwner ? (
+                  kpi.revenue === null ? (
+                    <>
+                      <StyledText variant="body" weight="semibold">売上未設定</StyledText>
+                      <StyledText variant="caption" color="secondary">main-chatで設定</StyledText>
+                    </>
+                  ) : (
+                    <>
+                      <StyledText variant="body" weight="semibold">¥{kpi.revenue.toLocaleString('ja-JP')}</StyledText>
+                      <StyledText variant="caption" color="secondary">売上</StyledText>
+                    </>
+                  )
                 ) : (
                   <>
-                    <StyledText variant="body" weight="semibold">¥{kpi.revenue.toLocaleString('ja-JP')}</StyledText>
-                    <StyledText variant="caption" color="secondary">売上</StyledText>
+                    <StyledText variant="body" weight="semibold">¥{kpi.expenseTotal.toLocaleString('ja-JP')}</StyledText>
+                    <StyledText variant="caption" color="secondary">経費合計</StyledText>
                   </>
                 )}
               </View>
@@ -575,6 +588,20 @@ export default function DashboardTab() {
     </Card>
   )
 
+  if (isUnassigned) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderJoinByCodeCard()}
+        </ScrollView>
+      </SafeAreaView>
+    )
+  }
+
   // 親方専用表示（userRole === 'parent'の場合のみ）
   if (userRole !== 'parent') {
     return (
@@ -585,7 +612,6 @@ export default function DashboardTab() {
           showsVerticalScrollIndicator={false}
         >
           {renderWelcomeCard()}
-          {renderJoinByCodeCard()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
