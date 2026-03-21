@@ -5,6 +5,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { listDailyReportsByProject, StoredDailyReport } from '@/lib/daily-report-store'
 import { getProjectById } from '@/lib/project-store'
+import { getAccessContext } from '@/lib/access-context'
+import { listProjectIdsForMember } from '@/lib/project-membership-store'
 
 export default function ProjectDailyReportsScreen() {
   const router = useRouter()
@@ -12,9 +14,25 @@ export default function ProjectDailyReportsScreen() {
 
   const [projectName, setProjectName] = useState<string>('')
   const [reports, setReports] = useState<StoredDailyReport[]>([])
+  const [accessDenied, setAccessDenied] = useState(false)
 
   const reload = async () => {
     if (!projectId) return
+
+    setAccessDenied(false)
+
+    const ctx = await getAccessContext()
+    if (ctx.kind === 'assigned' && ctx.role === 'member') {
+      // NOTE: 最小実装（userIdは暫定で local-user 固定）
+      const allowedIds = await listProjectIdsForMember(ctx.companyId, 'local-user')
+      if (!allowedIds.includes(projectId)) {
+        setAccessDenied(true)
+        setProjectName('')
+        setReports([])
+        return
+      }
+    }
+
     const p = await getProjectById(projectId)
     setProjectName(p?.name || '')
     const items = await listDailyReportsByProject(projectId)
@@ -54,6 +72,17 @@ export default function ProjectDailyReportsScreen() {
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 24 }}>
         {!projectId ? (
           <Text style={styles.muted}>現場が指定されていません。現場一覧から開き直してください。</Text>
+        ) : accessDenied ? (
+          <>
+            <Text style={styles.muted}>この現場にはアクセスできません。割り当てを確認してください。</Text>
+            <TouchableOpacity
+              style={[styles.backButton, { marginTop: Spacing.md }]}
+              onPress={() => router.replace('/project-selector')}
+              accessibilityLabel="現場一覧へ"
+            >
+              <Text style={styles.backButtonText}>現場一覧へ</Text>
+            </TouchableOpacity>
+          </>
         ) : reports.length === 0 ? (
           <Text style={styles.muted}>まだ日報がありません。main-chat から登録してください。</Text>
         ) : (

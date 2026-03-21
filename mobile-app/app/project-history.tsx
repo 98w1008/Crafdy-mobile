@@ -6,6 +6,8 @@ import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { getProjectById } from '@/lib/project-store'
 import { listExpensesByProject, StoredExpense } from '@/lib/expense-store'
 import { listDailyReportsByProject, StoredDailyReport } from '@/lib/daily-report-store'
+import { getAccessContext } from '@/lib/access-context'
+import { listProjectIdsForMember } from '@/lib/project-membership-store'
 
 type ProjectHistoryItem =
   | {
@@ -42,6 +44,7 @@ export default function ProjectHistoryScreen() {
 
   const [projectName, setProjectName] = useState<string>('')
   const [projectMissing, setProjectMissing] = useState(false)
+  const [accessDenied, setAccessDenied] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const [expenses, setExpenses] = useState<StoredExpense[]>([])
@@ -51,7 +54,21 @@ export default function ProjectHistoryScreen() {
     if (!projectId) return
     setLoading(true)
     setProjectMissing(false)
+    setAccessDenied(false)
     try {
+      const ctx = await getAccessContext()
+      if (ctx.kind === 'assigned' && ctx.role === 'member') {
+        // NOTE: 最小実装（userIdは暫定で local-user 固定）
+        const allowedIds = await listProjectIdsForMember(ctx.companyId, 'local-user')
+        if (!allowedIds.includes(projectId)) {
+          setAccessDenied(true)
+          setProjectName('')
+          setExpenses([])
+          setReports([])
+          return
+        }
+      }
+
       const p = await getProjectById(projectId)
       if (!p) {
         setProjectName('')
@@ -147,6 +164,17 @@ export default function ProjectHistoryScreen() {
           <Text style={styles.muted}>現場が指定されていません。現場一覧から開き直してください。</Text>
         ) : loading ? (
           <Text style={styles.muted}>読み込み中…</Text>
+        ) : accessDenied ? (
+          <>
+            <Text style={styles.muted}>この現場にはアクセスできません。割り当てを確認してください。</Text>
+            <TouchableOpacity
+              style={[styles.backButton, { marginTop: Spacing.md }]}
+              onPress={() => router.replace('/project-selector')}
+              accessibilityLabel="現場一覧へ"
+            >
+              <Text style={styles.backButtonText}>現場一覧へ</Text>
+            </TouchableOpacity>
+          </>
         ) : projectMissing ? (
           <Text style={styles.muted}>現場が見つかりません。現場一覧から開き直してください。</Text>
         ) : items.length === 0 ? (
