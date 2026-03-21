@@ -53,7 +53,7 @@ const seedIfEmpty = async (codes: InviteCode[]) => {
   return seeded
 }
 
-const listInviteCodes = async (): Promise<InviteCode[]> => {
+export const listInviteCodes = async (): Promise<InviteCode[]> => {
   const raw = await AsyncStorage.getItem(INVITE_CODES_KEY)
   const codes = safeParse<InviteCode[]>(raw, [])
   return seedIfEmpty(codes)
@@ -61,6 +61,63 @@ const listInviteCodes = async (): Promise<InviteCode[]> => {
 
 const saveInviteCodes = async (codes: InviteCode[]) => {
   await AsyncStorage.setItem(INVITE_CODES_KEY, JSON.stringify(codes))
+}
+
+const randomCode = (len: number) => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let out = ''
+  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)]
+  return out
+}
+
+export const createInviteCode = async (params: {
+  role: InviteCodeRole
+  expiresInDays: number
+}): Promise<{ code: string; expiresAt: string; id: string }> => {
+  const now = new Date()
+  const expires = new Date(now)
+  expires.setDate(expires.getDate() + Math.max(1, params.expiresInDays || 7))
+
+  const codes = await listInviteCodes()
+
+  const code = (() => {
+    // 8-12桁の英数（衝突したら再生成）
+    for (let i = 0; i < 10; i++) {
+      const c = randomCode(8)
+      if (!codes.some(x => x.code.toUpperCase() === c.toUpperCase())) return c
+    }
+    return randomCode(10)
+  })()
+
+  const id = `invite-${now.getTime()}`
+  const item: InviteCode = {
+    id,
+    // NOTE: 最小実装（companyId は暫定で local 固定）
+    // TODO: 後続PRで owner の companyId に紐づけて発行する。
+    companyId: 'local',
+    code,
+    role: params.role,
+    status: 'active',
+    createdAt: now.toISOString(),
+    expiresAt: expires.toISOString(),
+  }
+
+  const next = [item, ...codes]
+  await saveInviteCodes(next)
+  return { code: item.code, expiresAt: item.expiresAt, id: item.id }
+}
+
+export const revokeInviteCode = async (codeId: string): Promise<void> => {
+  const codes = await listInviteCodes()
+  const idx = codes.findIndex(c => c.id === codeId)
+  if (idx === -1) return
+
+  const prev = codes[idx]
+  if (prev.status !== 'active') return
+
+  const nextCodes = [...codes]
+  nextCodes[idx] = { ...prev, status: 'revoked' }
+  await saveInviteCodes(nextCodes)
 }
 
 export const redeemInviteCode = async (
