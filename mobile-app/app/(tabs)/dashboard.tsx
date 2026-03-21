@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import {
   View,
   StyleSheet,
@@ -64,6 +65,8 @@ export default function DashboardTab() {
   const [expenses, setExpenses] = useState<StoredExpense[]>([])
   const [dailyReports, setDailyReports] = useState<StoredDailyReport[]>([])
 
+  const [access, setAccess] = useState<AccessContext | null>(null)
+
   const reload = async () => {
     try {
       const [p, e, r] = await Promise.all([listProjects(), listExpenses(), listDailyReports()])
@@ -78,6 +81,13 @@ export default function DashboardTab() {
   useEffect(() => {
     reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    ;(async () => {
+      const ctx = await getAccessContext()
+      setAccess(ctx)
+    })()
   }, [])
 
   useFocusEffect(
