@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import {
   View,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   Alert,
 } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
+import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import { useAuth, useRole } from '@/contexts/AuthContext'
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
@@ -366,6 +366,26 @@ export default function DashboardTab() {
     </Card>
   )
 
+  const renderJoinByCodeCard = () => {
+    if (access?.kind !== 'unassigned') return null
+
+    return (
+      <Card variant="elevated" style={styles.joinCard}>
+        <StyledText variant="subtitle" weight="semibold">会社に参加してください</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          招待コードを入力して会社に参加すると、現場・日報・経費の記録が使えます。
+        </StyledText>
+        <View style={{ marginTop: Spacing.sm }}>
+          <StyledButton
+            title="招待コード入力へ"
+            variant="primary"
+            onPress={() => router.push('/join/by-code' as any)}
+          />
+        </View>
+      </Card>
+    )
+  }
+
   const renderProjectKpis = () => (
     <Card variant="elevated" style={styles.projectKpiCard}>
       <View style={styles.projectKpiHeader}>
@@ -565,6 +585,7 @@ export default function DashboardTab() {
           showsVerticalScrollIndicator={false}
         >
           {renderWelcomeCard()}
+          {renderJoinByCodeCard()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
@@ -591,6 +612,8 @@ export default function DashboardTab() {
 
         {/* ウェルカムカード */}
         {renderWelcomeCard()}
+
+        {renderJoinByCodeCard()}
 
         {/* 現場別（粗利/進捗の最小） */}
         {renderProjectKpis()}
@@ -626,6 +649,10 @@ const styles = StyleSheet.create({
   },
   welcomeCard: {
     marginBottom: Spacing.lg,
+  },
+  joinCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
   },
   projectKpiCard: {
     marginBottom: Spacing.lg,
