@@ -15,6 +15,7 @@ import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
 import { listProjects, StoredProject } from '@/lib/project-store'
 import { listExpenses, StoredExpense } from '@/lib/expense-store'
 import { listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
+import { listProjectIdsForMember } from '@/lib/project-membership-store'
 
 interface DashboardMetric {
   id: string
@@ -66,6 +67,7 @@ export default function DashboardTab() {
   const [dailyReports, setDailyReports] = useState<StoredDailyReport[]>([])
 
   const [access, setAccess] = useState<AccessContext | null>(null)
+  const [memberProjectIds, setMemberProjectIds] = useState<string[] | null>(null)
   const isUnassigned = access?.kind === 'unassigned'
   const isOwner = access?.kind === 'assigned' ? access.role === 'owner' : true
 
@@ -89,6 +91,14 @@ export default function DashboardTab() {
     ;(async () => {
       const ctx = await getAccessContext()
       setAccess(ctx)
+
+      if (ctx.kind === 'assigned' && ctx.role === 'member') {
+        // NOTE: 最小実装（userIdは暫定で local-user 固定）
+        const ids = await listProjectIdsForMember(ctx.companyId, 'local-user')
+        setMemberProjectIds(ids)
+      } else {
+        setMemberProjectIds(null)
+      }
     })()
   }, [])
 
@@ -111,7 +121,15 @@ export default function DashboardTab() {
       reportsByProject.set(r.projectId, arr)
     }
 
-    return projects.map(p => {
+    const visibleProjects = (() => {
+      if (access?.kind === 'assigned' && access.role === 'member' && memberProjectIds) {
+        const allowed = new Set(memberProjectIds)
+        return projects.filter(p => allowed.has(p.id))
+      }
+      return projects
+    })()
+
+    return visibleProjects.map(p => {
       const projectExpenses = expenseByProject.get(p.id) ?? 0
       const reports = (reportsByProject.get(p.id) ?? []).slice().sort((a, b) => b.date.localeCompare(a.date))
       const latest = reports[0]
@@ -141,7 +159,7 @@ export default function DashboardTab() {
         inputStatus,
       }
     })
-  }, [projects, expenses, dailyReports])
+  }, [projects, expenses, dailyReports, access?.kind, access?.role, memberProjectIds])
 
   // 建設業界特化ダッシュボードメトリクス（親方用）
   const dashboardMetrics: DashboardMetric[] = [

@@ -15,12 +15,16 @@ import { useFocusEffect, useRouter } from 'expo-router'
 
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { createProject, listProjects, setSelectedProject, StoredProject } from '@/lib/project-store'
+import { getAccessContext, type AccessContext } from '@/lib/access-context'
+import { listProjectIdsForMember } from '@/lib/project-membership-store'
 
 export default function ProjectSelectorScreen() {
   const router = useRouter()
 
   const [projects, setProjects] = useState<StoredProject[]>([])
   const [loading, setLoading] = useState(true)
+
+  const [access, setAccess] = useState<AccessContext | null>(null)
 
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -31,8 +35,20 @@ export default function ProjectSelectorScreen() {
   const reload = async () => {
     setLoading(true)
     try {
+      const ctx = await getAccessContext()
+      setAccess(ctx)
+
       const items = await listProjects()
-      setProjects(items)
+
+      if (ctx.kind === 'assigned' && ctx.role === 'member') {
+        // NOTE: 最小実装（userIdは暫定で local-user 固定）
+        const ids = await listProjectIdsForMember(ctx.companyId, 'local-user')
+        const allowed = new Set(ids)
+        setProjects(items.filter(p => allowed.has(p.id)))
+      } else {
+        // owner / office: 全現場
+        setProjects(items)
+      }
     } finally {
       setLoading(false)
     }
@@ -82,6 +98,8 @@ export default function ProjectSelectorScreen() {
       Alert.alert('エラー', '現場の作成に失敗しました')
     }
   }
+
+  const canCreateProject = access?.kind === 'assigned' && access.role === 'owner'
 
   return (
     <SafeAreaView style={styles.container}>
@@ -157,52 +175,56 @@ export default function ProjectSelectorScreen() {
             </View>
           )}
 
-          <View style={styles.divider} />
+          {canCreateProject ? (
+            <>
+              <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>新規作成</Text>
-          <Text style={styles.muted}>必須は現場名だけです（住所/メモは任意）。</Text>
+              <Text style={styles.sectionTitle}>新規作成</Text>
+              <Text style={styles.muted}>必須は現場名だけです（住所/メモは任意）。</Text>
 
-          <View style={styles.form}>
-            <Text style={styles.label}>現場名（必須）</Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="例）○○ビル新築工事"
-              placeholderTextColor={Colors.dark.text.tertiary}
-              maxLength={60}
-            />
+              <View style={styles.form}>
+                <Text style={styles.label}>現場名（必須）</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="例）○○ビル新築工事"
+                  placeholderTextColor={Colors.dark.text.tertiary}
+                  maxLength={60}
+                />
 
-            <Text style={styles.label}>住所（任意）</Text>
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="例）東京都新宿区…"
-              placeholderTextColor={Colors.dark.text.tertiary}
-              maxLength={120}
-            />
+                <Text style={styles.label}>住所（任意）</Text>
+                <TextInput
+                  style={styles.input}
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="例）東京都新宿区…"
+                  placeholderTextColor={Colors.dark.text.tertiary}
+                  maxLength={120}
+                />
 
-            <Text style={styles.label}>メモ（任意）</Text>
-            <TextInput
-              style={[styles.input, styles.textarea]}
-              value={memo}
-              onChangeText={setMemo}
-              placeholder="例）元請: ○○建設 / 鍵: 1234"
-              placeholderTextColor={Colors.dark.text.tertiary}
-              multiline
-              maxLength={240}
-            />
+                <Text style={styles.label}>メモ（任意）</Text>
+                <TextInput
+                  style={[styles.input, styles.textarea]}
+                  value={memo}
+                  onChangeText={setMemo}
+                  placeholder="例）元請: ○○建設 / 鍵: 1234"
+                  placeholderTextColor={Colors.dark.text.tertiary}
+                  multiline
+                  maxLength={240}
+                />
 
-            <TouchableOpacity
-              style={[styles.primaryButton, !canCreate && styles.primaryButtonDisabled]}
-              disabled={!canCreate}
-              onPress={handleCreate}
-              accessibilityLabel="現場を作成"
-            >
-              <Text style={styles.primaryButtonText}>＋ 現場を作成してチャットへ</Text>
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  style={[styles.primaryButton, !canCreate && styles.primaryButtonDisabled]}
+                  disabled={!canCreate}
+                  onPress={handleCreate}
+                  accessibilityLabel="現場を作成"
+                >
+                  <Text style={styles.primaryButtonText}>＋ 現場を作成してチャットへ</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
