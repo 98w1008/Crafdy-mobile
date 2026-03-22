@@ -8,6 +8,12 @@ import { getProjectById } from '@/lib/project-store'
 import { getAccessContext } from '@/lib/access-context'
 import { listProjectIdsForMember } from '@/lib/project-membership-store'
 
+const reviewStatusLabel = (s: StoredDailyReport['reviewStatus']) => {
+  if (s === 'submitted') return '確認待ち'
+  if (s === 'approved') return '承認済み'
+  return '下書き'
+}
+
 export default function ProjectDailyReportsScreen() {
   const router = useRouter()
   const { projectId } = useLocalSearchParams<{ projectId?: string }>()
@@ -95,6 +101,7 @@ export default function ProjectDailyReportsScreen() {
                 <Text style={styles.itemMeta} numberOfLines={2}>
                   人数/時間: {r.workforceTime} / 明日: {r.nextPlan}
                 </Text>
+                <Text style={styles.itemStatus}>状態: {reviewStatusLabel(r.reviewStatus)}</Text>
               </View>
             ))}
           </View>
@@ -167,6 +174,11 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
   },
   itemMeta: {
+    color: Colors.dark.text.secondary,
+    fontSize: Typography.sizes.xs,
+    marginTop: 4,
+  },
+  itemStatus: {
     color: Colors.dark.text.secondary,
     fontSize: Typography.sizes.xs,
     marginTop: 4,

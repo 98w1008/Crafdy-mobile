@@ -25,6 +25,12 @@ type ProjectHistoryItem =
       report: StoredDailyReport
     }
 
+const reviewStatusLabel = (s: StoredExpense['reviewStatus']) => {
+  if (s === 'submitted') return '確認待ち'
+  if (s === 'approved') return '承認済み'
+  return '下書き'
+}
+
 const kindLabel = (k: StoredExpense['kind']) => {
   switch (k) {
     case 'receipt':
@@ -189,8 +195,11 @@ export default function ProjectHistoryScreen() {
                   <View key={item.id} style={styles.item}>
                     <View style={styles.itemTop}>
                       <Text style={styles.itemDate}>{item.date || '（日付なし）'}</Text>
-                      <View style={[styles.badge, styles.badgeExpense]}>
-                        <Text style={styles.badgeText}>経費</Text>
+                      <View style={styles.itemTopRight}>
+                        <Text style={styles.itemStatus}>状態: {reviewStatusLabel(item.expense.reviewStatus)}</Text>
+                        <View style={[styles.badge, styles.badgeExpense]}>
+                          <Text style={styles.badgeText}>経費</Text>
+                        </View>
                       </View>
                     </View>
                     <Text style={styles.itemSummary} numberOfLines={1}>
@@ -211,8 +220,11 @@ export default function ProjectHistoryScreen() {
                 <View key={item.id} style={styles.item}>
                   <View style={styles.itemTop}>
                     <Text style={styles.itemDate}>{item.date || '（日付なし）'}</Text>
-                    <View style={[styles.badge, styles.badgeDaily]}>
-                      <Text style={styles.badgeText}>日報</Text>
+                    <View style={styles.itemTopRight}>
+                      <Text style={styles.itemStatus}>状態: {reviewStatusLabel(item.report.reviewStatus)}</Text>
+                      <View style={[styles.badge, styles.badgeDaily]}>
+                        <Text style={styles.badgeText}>日報</Text>
+                      </View>
                     </View>
                   </View>
                   <Text style={styles.itemSummary} numberOfLines={1}>
@@ -294,7 +306,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
+  itemTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   itemDate: {
+    color: Colors.dark.text.secondary,
+    fontSize: Typography.sizes.xs,
+  },
+  itemStatus: {
     color: Colors.dark.text.secondary,
     fontSize: Typography.sizes.xs,
   },
