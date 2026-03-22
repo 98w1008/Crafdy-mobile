@@ -14,6 +14,15 @@ const reviewStatusLabel = (s: StoredDailyReport['reviewStatus']) => {
   return '下書き'
 }
 
+const formatDemen = (r: StoredDailyReport) => {
+  const parts: string[] = []
+  if (typeof r.selfWorkersCount === 'number') parts.push(`自社${r.selfWorkersCount}人`)
+  for (const p of r.partnerWorkers || []) {
+    if (p.companyName && p.workersCount > 0) parts.push(`${p.companyName}${p.workersCount}人`)
+  }
+  return parts.length ? `出面: ${parts.join(' / ')}` : ''
+}
+
 export default function ProjectDailyReportsScreen() {
   const router = useRouter()
   const { projectId } = useLocalSearchParams<{ projectId?: string }>()
@@ -102,6 +111,7 @@ export default function ProjectDailyReportsScreen() {
                   人数/時間: {r.workforceTime} / 明日: {r.nextPlan}
                 </Text>
                 <Text style={styles.itemStatus}>状態: {reviewStatusLabel(r.reviewStatus)}</Text>
+                {formatDemen(r) ? <Text style={styles.itemStatus}>{formatDemen(r)}</Text> : null}
               </View>
             ))}
           </View>

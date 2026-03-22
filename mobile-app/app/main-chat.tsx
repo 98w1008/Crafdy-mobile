@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
 import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
 import { createExpense, ExpenseKind, submitExpense } from '@/lib/expense-store'
-import { createDailyReport, submitDailyReport } from '@/lib/daily-report-store'
+import { createDailyReport, submitDailyReport, type PartnerWorkerEntry } from '@/lib/daily-report-store'
 
 interface Message {
   id: string
@@ -52,6 +52,8 @@ type DailyReportDraft = {
   work?: string
   workforceTime?: string
   nextPlan?: string
+  selfWorkersCount?: number
+  partnerWorkers?: PartnerWorkerEntry[]
 }
 
 type EstimateCollected = {
@@ -507,6 +509,30 @@ const parseDailyReportWorkforceTime = (text: string): string | undefined => {
 const parseDailyReportNextPlan = (text: string): string | undefined => {
   if (!/(明日|次回|続き|予定)/.test(text)) return undefined
   return text.trim()
+}
+
+const parseDailyReportSelfWorkersCount = (text: string): number | undefined => {
+  const m = text.match(/(?:うち)?自社\s*(\d+)\s*(?:人|名)/)
+  if (!m?.[1]) return undefined
+  const n = Number(m[1])
+  if (!Number.isFinite(n) || n <= 0) return undefined
+  return Math.floor(n)
+}
+
+const parseDailyReportPartnerWorkers = (text: string): PartnerWorkerEntry[] => {
+  const out: PartnerWorkerEntry[] = []
+
+  const re = /(?:協力会社\s*)?([^\s　]+(?:工業|建設|防水|電気|設備|塗装|解体|内装|土木|水道|空調|ガス))\s*(\d+)\s*(?:人|名)/g
+  for (const m of text.matchAll(re)) {
+    const name = (m?.[1] || '').trim()
+    const n = Number(m?.[2])
+    if (!name || name.includes('自社')) continue
+    if (!Number.isFinite(n) || n <= 0) continue
+    out.push({ companyName: name, workersCount: Math.floor(n) })
+    if (out.length >= 2) break
+  }
+
+  return out
 }
 
 const isEstimateGenerateInstruction = (text: string) => {
@@ -1204,6 +1230,8 @@ export default function SimpleChatScreen() {
       const work = parseDailyReportWork(trimmed)
       const workforceTime = parseDailyReportWorkforceTime(trimmed)
       const nextPlan = parseDailyReportNextPlan(trimmed)
+      const selfWorkersCount = parseDailyReportSelfWorkersCount(trimmed)
+      const partnerWorkers = parseDailyReportPartnerWorkers(trimmed)
 
       const isDailyReportLike =
         isDailyReportIntake ||
@@ -1219,6 +1247,8 @@ export default function SimpleChatScreen() {
           work: work ?? dailyReportDraft.work,
           workforceTime: workforceTime ?? dailyReportDraft.workforceTime,
           nextPlan: nextPlan ?? dailyReportDraft.nextPlan,
+          selfWorkersCount: selfWorkersCount ?? dailyReportDraft.selfWorkersCount,
+          partnerWorkers: partnerWorkers.length ? partnerWorkers : dailyReportDraft.partnerWorkers,
         }
 
         const normalized: DailyReportDraft = {
@@ -1226,6 +1256,8 @@ export default function SimpleChatScreen() {
           work: merged.work,
           workforceTime: merged.workforceTime,
           nextPlan: merged.nextPlan,
+          selfWorkersCount: merged.selfWorkersCount,
+          partnerWorkers: merged.partnerWorkers,
         }
 
         if (!normalized.work) {
@@ -1274,6 +1306,8 @@ export default function SimpleChatScreen() {
             work: normalized.work!,
             workforceTime: normalized.workforceTime!,
             nextPlan: normalized.nextPlan!,
+            selfWorkersCount: normalized.selfWorkersCount,
+            partnerWorkers: normalized.partnerWorkers,
           })
 
           setDailyReportDraft(defaultDailyReportDraft)
@@ -1281,9 +1315,18 @@ export default function SimpleChatScreen() {
 
           setLastDraftTarget({ type: 'daily_report', id: saved.id, projectName: selectedProject.name })
 
+          const demenText = (() => {
+            const parts: string[] = []
+            if (typeof saved.selfWorkersCount === 'number') parts.push(`自社${saved.selfWorkersCount}人`)
+            for (const p of saved.partnerWorkers || []) {
+              if (p.companyName && p.workersCount > 0) parts.push(`${p.companyName}${p.workersCount}人`)
+            }
+            return parts.length ? `出面: ${parts.join(' / ')}` : ''
+          })()
+
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。\n確認依頼する場合は「確認依頼」と送ってください。`,
+            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。${demenText ? `\n${demenText}` : ''}\n確認依頼する場合は「確認依頼」と送ってください。`,
             sender: 'ai',
             timestamp: new Date(),
           }

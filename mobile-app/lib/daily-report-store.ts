@@ -2,6 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export type ReviewStatus = 'draft' | 'submitted' | 'approved'
 
+export type PartnerWorkerEntry = {
+  companyName: string
+  workersCount: number
+}
+
 export type StoredDailyReport = {
   id: string
   projectId: string
@@ -10,6 +15,8 @@ export type StoredDailyReport = {
   workforceTime: string
   nextPlan: string
   memo?: string
+  selfWorkersCount?: number
+  partnerWorkers?: PartnerWorkerEntry[]
   reviewStatus: ReviewStatus
   createdAt: string
 }
@@ -30,11 +37,30 @@ const ensureReviewStatus = (v: any): ReviewStatus => {
   return 'draft'
 }
 
+const ensureSelfWorkersCount = (v: any): number | undefined => {
+  if (typeof v !== 'number') return undefined
+  if (!Number.isFinite(v) || v < 0) return undefined
+  return Math.floor(v)
+}
+
+const ensurePartnerWorkers = (v: any): PartnerWorkerEntry[] => {
+  if (!Array.isArray(v)) return []
+  return v
+    .map((x: any) => ({
+      companyName: String(x?.companyName || '').trim(),
+      workersCount: Number(x?.workersCount),
+    }))
+    .filter(x => x.companyName && Number.isFinite(x.workersCount) && x.workersCount > 0)
+    .map(x => ({ ...x, workersCount: Math.floor(x.workersCount) }))
+}
+
 export const listDailyReports = async (): Promise<StoredDailyReport[]> => {
   const raw = await AsyncStorage.getItem(DAILY_REPORTS_KEY)
   const items = safeParse<any[]>(raw, [])
   return items.map((r: any) => ({
     ...r,
+    selfWorkersCount: ensureSelfWorkersCount(r?.selfWorkersCount),
+    partnerWorkers: ensurePartnerWorkers(r?.partnerWorkers),
     reviewStatus: ensureReviewStatus(r?.reviewStatus),
   })) as StoredDailyReport[]
 }
@@ -55,6 +81,8 @@ export const createDailyReport = async (params: {
   workforceTime: string
   nextPlan: string
   memo?: string
+  selfWorkersCount?: number
+  partnerWorkers?: PartnerWorkerEntry[]
 }): Promise<StoredDailyReport> => {
   const items = await listDailyReports()
   const now = new Date()
@@ -66,6 +94,8 @@ export const createDailyReport = async (params: {
     workforceTime: params.workforceTime,
     nextPlan: params.nextPlan,
     memo: params.memo?.trim() || undefined,
+    selfWorkersCount: typeof params.selfWorkersCount === 'number' ? params.selfWorkersCount : undefined,
+    partnerWorkers: params.partnerWorkers?.length ? params.partnerWorkers : undefined,
     reviewStatus: 'draft',
     createdAt: now.toISOString(),
   }
