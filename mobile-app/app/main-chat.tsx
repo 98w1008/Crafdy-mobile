@@ -13,8 +13,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
 import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
-import { createExpense, ExpenseKind } from '@/lib/expense-store'
-import { createDailyReport } from '@/lib/daily-report-store'
+import { createExpense, ExpenseKind, submitExpense } from '@/lib/expense-store'
+import { createDailyReport, submitDailyReport } from '@/lib/daily-report-store'
 
 interface Message {
   id: string
@@ -1013,6 +1013,12 @@ export default function SimpleChatScreen() {
   const [dailyReportCollected, setDailyReportCollected] = useState<DailyReportCollected>(defaultDailyReportCollected)
   const [invoiceCollected, setInvoiceCollected] = useState<InvoiceCollected>(defaultInvoiceCollected)
 
+  const [lastDraftTarget, setLastDraftTarget] = useState<
+    | { type: 'daily_report'; id: string; projectName?: string }
+    | { type: 'expense'; id: string; projectName?: string }
+    | null
+  >(null)
+
   const { newProjectId, newProjectName, selectedProjectId, selectedProjectName } = useLocalSearchParams<{
     newProjectId?: string
     newProjectName?: string
@@ -1120,6 +1126,34 @@ export default function SimpleChatScreen() {
 
     setMessages(prev => [...prev, userMessage])
     setInputText('')
+
+    // 確認依頼（最小導線）: 直前に保存した draft を submitted にする
+    const isSubmitRequest = /(確認依頼|提出|確認お願いします|代表確認)/.test(trimmed)
+    if (isSubmitRequest && lastDraftTarget) {
+      ;(async () => {
+        if (lastDraftTarget.type === 'daily_report') {
+          await submitDailyReport(lastDraftTarget.id)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `OKです。日報を確認依頼にしました。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+        } else {
+          await submitExpense(lastDraftTarget.id)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `OKです。経費を確認依頼にしました。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+        }
+        setLastDraftTarget(null)
+      })()
+      return
+    }
 
     // 現場の売上（見込み売上）更新: 選択中の現場がある時だけ
     if (selectedProject?.id) {
@@ -1245,9 +1279,11 @@ export default function SimpleChatScreen() {
           setDailyReportDraft(defaultDailyReportDraft)
           setIsDailyReportIntake(false)
 
+          setLastDraftTarget({ type: 'daily_report', id: saved.id, projectName: selectedProject.name })
+
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。`,
+            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。\n確認依頼する場合は「確認依頼」と送ってください。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -1336,9 +1372,11 @@ export default function SimpleChatScreen() {
                   ? '外注'
                   : '経費'
 
+          setLastDraftTarget({ type: 'expense', id: saved.id, projectName: selectedProject.name })
+
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。[${selectedProject.name}] に ${kindLabel} ¥${saved.amount.toLocaleString('ja-JP')} を保存しました。`,
+            text: `OK。[${selectedProject.name}] に ${kindLabel} ¥${saved.amount.toLocaleString('ja-JP')} を保存しました。\n確認依頼する場合は「確認依頼」と送ってください。`,
             sender: 'ai',
             timestamp: new Date(),
           }

@@ -72,3 +72,16 @@ export const createExpense = async (params: {
   await saveExpenses([expense, ...items])
   return expense
 }
+
+export const submitExpense = async (expenseId: string): Promise<void> => {
+  const items = await listExpenses()
+  const idx = items.findIndex(e => e.id === expenseId)
+  if (idx === -1) return
+
+  const prev = items[idx]
+  if (prev.reviewStatus !== 'draft') return
+
+  const next = [...items]
+  next[idx] = { ...prev, reviewStatus: 'submitted' }
+  await saveExpenses(next)
+}
