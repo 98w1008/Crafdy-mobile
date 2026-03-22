@@ -14,7 +14,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
 import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
 import { createExpense, ExpenseKind, submitExpense } from '@/lib/expense-store'
-import { createDailyReport, submitDailyReport, type PartnerWorkerEntry } from '@/lib/daily-report-store'
+import {
+  createDailyReport,
+  markDailyReportNoExpense,
+  submitDailyReport,
+  type PartnerWorkerEntry,
+} from '@/lib/daily-report-store'
 
 interface Message {
   id: string
@@ -1153,6 +1158,23 @@ export default function SimpleChatScreen() {
     setMessages(prev => [...prev, userMessage])
     setInputText('')
 
+    // 経費なし（最小導線）: 直前に保存した日報を「経費なし確認済み」にする
+    const isNoExpense = /(経費なし|今日は経費なし|本日経費なし|経費はない)/.test(trimmed)
+    if (isNoExpense && lastDraftTarget?.type === 'daily_report') {
+      ;(async () => {
+        await markDailyReportNoExpense(lastDraftTarget.id)
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `OKです。日報を経費なしで確認済みにしました。`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        setLastDraftTarget(null)
+      })()
+      return
+    }
+
     // 確認依頼（最小導線）: 直前に保存した draft を submitted にする
     const isSubmitRequest = /(確認依頼|提出|確認お願いします|代表確認)/.test(trimmed)
     if (isSubmitRequest && lastDraftTarget) {
@@ -1326,7 +1348,7 @@ export default function SimpleChatScreen() {
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。${demenText ? `\n${demenText}` : ''}\n確認依頼する場合は「確認依頼」と送ってください。`,
+            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。${demenText ? `\n${demenText}` : ''}\n経費が無ければ「経費なし」と送ってください。\n確認依頼する場合は「確認依頼」と送ってください。`,
             sender: 'ai',
             timestamp: new Date(),
           }

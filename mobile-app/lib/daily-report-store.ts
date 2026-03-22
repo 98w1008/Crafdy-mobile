@@ -7,6 +7,8 @@ export type PartnerWorkerEntry = {
   workersCount: number
 }
 
+export type ExpenseCheckStatus = 'unknown' | 'none'
+
 export type StoredDailyReport = {
   id: string
   projectId: string
@@ -17,6 +19,7 @@ export type StoredDailyReport = {
   memo?: string
   selfWorkersCount?: number
   partnerWorkers?: PartnerWorkerEntry[]
+  expenseCheckStatus?: ExpenseCheckStatus
   reviewStatus: ReviewStatus
   createdAt: string
 }
@@ -54,6 +57,11 @@ const ensurePartnerWorkers = (v: any): PartnerWorkerEntry[] => {
     .map(x => ({ ...x, workersCount: Math.floor(x.workersCount) }))
 }
 
+const ensureExpenseCheckStatus = (v: any): ExpenseCheckStatus => {
+  if (v === 'none') return 'none'
+  return 'unknown'
+}
+
 export const listDailyReports = async (): Promise<StoredDailyReport[]> => {
   const raw = await AsyncStorage.getItem(DAILY_REPORTS_KEY)
   const items = safeParse<any[]>(raw, [])
@@ -61,6 +69,7 @@ export const listDailyReports = async (): Promise<StoredDailyReport[]> => {
     ...r,
     selfWorkersCount: ensureSelfWorkersCount(r?.selfWorkersCount),
     partnerWorkers: ensurePartnerWorkers(r?.partnerWorkers),
+    expenseCheckStatus: ensureExpenseCheckStatus(r?.expenseCheckStatus),
     reviewStatus: ensureReviewStatus(r?.reviewStatus),
   })) as StoredDailyReport[]
 }
@@ -96,6 +105,7 @@ export const createDailyReport = async (params: {
     memo: params.memo?.trim() || undefined,
     selfWorkersCount: typeof params.selfWorkersCount === 'number' ? params.selfWorkersCount : undefined,
     partnerWorkers: params.partnerWorkers?.length ? params.partnerWorkers : undefined,
+    expenseCheckStatus: 'unknown',
     reviewStatus: 'draft',
     createdAt: now.toISOString(),
   }
@@ -127,5 +137,17 @@ export const approveDailyReport = async (reportId: string): Promise<void> => {
 
   const next = [...items]
   next[idx] = { ...prev, reviewStatus: 'approved' }
+  await saveDailyReports(next)
+}
+
+export const markDailyReportNoExpense = async (reportId: string): Promise<void> => {
+  const items = await listDailyReports()
+  const idx = items.findIndex(r => r.id === reportId)
+  if (idx === -1) return
+
+  const prev = items[idx]
+
+  const next = [...items]
+  next[idx] = { ...prev, expenseCheckStatus: 'none' }
   await saveDailyReports(next)
 }

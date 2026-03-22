@@ -117,8 +117,12 @@ export default function DashboardTab() {
 
   const projectKpis: ProjectKpi[] = useMemo(() => {
     const expenseByProject = new Map<string, number>()
+    const expenseDatesByProject = new Map<string, Set<string>>()
     for (const e of expenses) {
       expenseByProject.set(e.projectId, (expenseByProject.get(e.projectId) ?? 0) + (e.amount ?? 0))
+      const set = expenseDatesByProject.get(e.projectId) ?? new Set<string>()
+      if (e.date) set.add(e.date)
+      expenseDatesByProject.set(e.projectId, set)
     }
 
     const reportsByProject = new Map<string, StoredDailyReport[]>()
@@ -162,6 +166,12 @@ export default function DashboardTab() {
       if (projectExpenses <= 0) inputNotes.push('経費0件')
       if (reports.length === 0) inputNotes.push('日報0件')
       if (reports.length > 0 && !(latest?.nextPlan || '').trim()) inputNotes.push('最新日報: 明日の予定なし')
+
+      if (latest?.date) {
+        const hasExpenseSameDate = expenseDatesByProject.get(p.id)?.has(latest.date) ?? false
+        const expenseCheckNone = latest.expenseCheckStatus === 'none'
+        if (!hasExpenseSameDate && !expenseCheckNone) inputNotes.push('最新日報: 経費未確認')
+      }
 
       const inputStatus = inputNotes.length === 0 ? '入力状況: OK' : `要確認: ${inputNotes.join(' / ')}`
 
