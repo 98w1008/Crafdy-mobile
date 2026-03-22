@@ -70,6 +70,7 @@ export default function DashboardTab() {
   const [memberProjectIds, setMemberProjectIds] = useState<string[] | null>(null)
   const isUnassigned = access?.kind === 'unassigned'
   const isOwner = access?.kind === 'assigned' ? access.role === 'owner' : true
+  const canSeeCompanySettings = access?.kind === 'assigned' && access.role === 'owner'
 
   const reload = async () => {
     try {
@@ -406,6 +407,26 @@ export default function DashboardTab() {
     )
   }
 
+  const renderCompanySettingsLink = () => {
+    if (!canSeeCompanySettings) return null
+
+    return (
+      <Card variant="elevated" style={styles.companySettingsCard}>
+        <StyledText variant="subtitle" weight="semibold">会社設定</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          招待コードの発行/無効化
+        </StyledText>
+        <View style={{ marginTop: Spacing.sm }}>
+          <StyledButton
+            title="招待コード管理へ"
+            variant="secondary"
+            onPress={() => router.push('/company/settings' as any)}
+          />
+        </View>
+      </Card>
+    )
+  }
+
   const renderProjectKpis = () => (
     <Card variant="elevated" style={styles.projectKpiCard}>
       <View style={styles.projectKpiHeader}>
@@ -630,6 +651,7 @@ export default function DashboardTab() {
           showsVerticalScrollIndicator={false}
         >
           {renderWelcomeCard()}
+          {renderCompanySettingsLink()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
@@ -656,6 +678,8 @@ export default function DashboardTab() {
 
         {/* ウェルカムカード */}
         {renderWelcomeCard()}
+
+        {renderCompanySettingsLink()}
 
         {renderJoinByCodeCard()}
 
@@ -695,6 +719,10 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   joinCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  companySettingsCard: {
     marginBottom: Spacing.lg,
     padding: Spacing.md,
   },
