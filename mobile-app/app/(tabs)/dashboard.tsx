@@ -173,6 +173,12 @@ export default function DashboardTab() {
         if (!hasExpenseSameDate && !expenseCheckNone) inputNotes.push('最新日報: 経費未確認')
       }
 
+      if (latest) {
+        const hasSelf = typeof latest.selfWorkersCount === 'number'
+        const hasPartners = (latest.partnerWorkers || []).length > 0
+        if (!hasSelf && !hasPartners) inputNotes.push('最新日報: 出面未入力')
+      }
+
       const inputStatus = inputNotes.length === 0 ? '入力状況: OK' : `要確認: ${inputNotes.join(' / ')}`
 
       return {
