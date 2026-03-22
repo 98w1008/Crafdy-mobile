@@ -86,3 +86,16 @@ export const submitDailyReport = async (reportId: string): Promise<void> => {
   next[idx] = { ...prev, reviewStatus: 'submitted' }
   await saveDailyReports(next)
 }
+
+export const approveDailyReport = async (reportId: string): Promise<void> => {
+  const items = await listDailyReports()
+  const idx = items.findIndex(r => r.id === reportId)
+  if (idx === -1) return
+
+  const prev = items[idx]
+  if (prev.reviewStatus !== 'submitted') return
+
+  const next = [...items]
+  next[idx] = { ...prev, reviewStatus: 'approved' }
+  await saveDailyReports(next)
+}

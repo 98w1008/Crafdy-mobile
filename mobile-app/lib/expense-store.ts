@@ -85,3 +85,16 @@ export const submitExpense = async (expenseId: string): Promise<void> => {
   next[idx] = { ...prev, reviewStatus: 'submitted' }
   await saveExpenses(next)
 }
+
+export const approveExpense = async (expenseId: string): Promise<void> => {
+  const items = await listExpenses()
+  const idx = items.findIndex(e => e.id === expenseId)
+  if (idx === -1) return
+
+  const prev = items[idx]
+  if (prev.reviewStatus !== 'submitted') return
+
+  const next = [...items]
+  next[idx] = { ...prev, reviewStatus: 'approved' }
+  await saveExpenses(next)
+}

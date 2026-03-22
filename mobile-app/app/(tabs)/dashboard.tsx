@@ -13,8 +13,8 @@ import { useAuth, useRole } from '@/contexts/AuthContext'
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
 import { listProjects, StoredProject } from '@/lib/project-store'
-import { listExpenses, StoredExpense } from '@/lib/expense-store'
-import { listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
+import { approveExpense, listExpenses, StoredExpense } from '@/lib/expense-store'
+import { approveDailyReport, listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
 import { listProjectIdsForMember } from '@/lib/project-membership-store'
 import { getApprovalMode, type ApprovalMode } from '@/lib/approval-mode-store'
 
@@ -434,6 +434,8 @@ export default function DashboardTab() {
     access?.kind === 'assigned' &&
     (access.role === 'owner' || (access.role === 'office' && approvalMode === 'ownerplus_office'))
 
+  const canApprovePendingReviews = canSeePendingReviews
+
   const pendingDailyReports = useMemo(() => {
     if (!canSeePendingReviews) return [] as StoredDailyReport[]
     return dailyReports.filter(r => r.reviewStatus === 'submitted')
@@ -450,6 +452,7 @@ export default function DashboardTab() {
     const items = [
       ...pendingDailyReports.map(r => ({
         key: `dr-${r.id}`,
+        id: r.id,
         type: '日報' as const,
         projectId: r.projectId,
         primary: `${r.date} / ${r.work}`,
@@ -457,6 +460,7 @@ export default function DashboardTab() {
       })),
       ...pendingExpenses.map(e => ({
         key: `ex-${e.id}`,
+        id: e.id,
         type: '経費' as const,
         projectId: e.projectId,
         primary: `${e.kind} / ¥${(e.amount ?? 0).toLocaleString('ja-JP')}`,
@@ -489,6 +493,22 @@ export default function DashboardTab() {
                 <StyledText variant="caption" color="secondary" numberOfLines={1} style={{ flex: 2 }}>
                   {it.primary}
                 </StyledText>
+
+                {canApprovePendingReviews ? (
+                  <TouchableOpacity
+                    style={styles.approveButton}
+                    onPress={async () => {
+                      if (it.type === '日報') await approveDailyReport(it.id)
+                      else await approveExpense(it.id)
+                      await reload()
+                    }}
+                    accessibilityLabel="承認"
+                  >
+                    <StyledText variant="caption" weight="semibold" color="primary">
+                      承認
+                    </StyledText>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ))}
           </View>
@@ -807,6 +827,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  approveButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
   projectKpiCard: {
     marginBottom: Spacing.lg,
