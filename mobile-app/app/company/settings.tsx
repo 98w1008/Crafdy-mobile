@@ -18,6 +18,11 @@ import {
   type InviteCode,
   type InviteCodeRole,
 } from '@/lib/invite-code-store'
+import {
+  getApprovalMode,
+  setApprovalMode,
+  type ApprovalMode,
+} from '@/lib/approval-mode-store'
 
 const roleLabel = (role: InviteCodeRole) => (role === 'office' ? '事務' : '従業員')
 
@@ -27,6 +32,7 @@ export default function CompanySettingsScreen() {
   const [isAllowed, setIsAllowed] = useState(false)
 
   const [role, setRole] = useState<InviteCodeRole>('member')
+  const [approvalMode, setApprovalModeState] = useState<ApprovalMode>('owneronly')
   const [codes, setCodes] = useState<InviteCode[]>([])
   const [message, setMessage] = useState<string>('')
 
@@ -42,8 +48,9 @@ export default function CompanySettingsScreen() {
         return
       }
 
-      const items = await listInviteCodes()
+      const [items, mode] = await Promise.all([listInviteCodes(), getApprovalMode()])
       setCodes(items)
+      setApprovalModeState(mode)
     } finally {
       setLoading(false)
     }
@@ -76,6 +83,17 @@ export default function CompanySettingsScreen() {
     }
   }
 
+  const handleChangeApprovalMode = async (next: ApprovalMode) => {
+    setMessage('')
+    try {
+      await setApprovalMode(next)
+      setApprovalModeState(next)
+      setMessage('確認者設定を保存しました。')
+    } catch {
+      setMessage('確認者設定の保存に失敗しました。')
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -100,6 +118,28 @@ export default function CompanySettingsScreen() {
           <Text style={styles.muted}>この画面は代表アカウントのみ利用できます。</Text>
         ) : (
           <>
+            <Text style={styles.sectionTitle}>確認者設定</Text>
+            <View style={styles.roleRow}>
+              <TouchableOpacity
+                style={[styles.rolePill, approvalMode === 'owneronly' && styles.rolePillActive]}
+                onPress={() => handleChangeApprovalMode('owneronly')}
+                accessibilityLabel="代表のみ"
+              >
+                <Text style={styles.rolePillText}>代表のみ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.rolePill, approvalMode === 'ownerplus_office' && styles.rolePillActive]}
+                onPress={() => handleChangeApprovalMode('ownerplus_office')}
+                accessibilityLabel="代表 + 事務"
+              >
+                <Text style={styles.rolePillText}>代表 + 事務</Text>
+              </TouchableOpacity>
+            </View>
+
+            {!!message && <Text style={styles.message}>{message}</Text>}
+
+            <View style={styles.divider} />
+
             <Text style={styles.sectionTitle}>招待コード発行</Text>
             <View style={styles.roleRow}>
               <TouchableOpacity
