@@ -56,6 +56,8 @@ type ProjectKpi = {
   dailyReportCount: number
   latestWork: string | null
   inputStatus: string
+  selfWorkersTotal: number
+  partnerWorkersTotal: number
 }
 
 export default function DashboardTab() {
@@ -73,6 +75,7 @@ export default function DashboardTab() {
   const isUnassigned = access?.kind === 'unassigned'
   const isOwner = access?.kind === 'assigned' ? access.role === 'owner' : true
   const canSeeCompanySettings = access?.kind === 'assigned' && access.role === 'owner'
+  const canSeeWorkforceTotals = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
@@ -119,10 +122,19 @@ export default function DashboardTab() {
     }
 
     const reportsByProject = new Map<string, StoredDailyReport[]>()
+    const workforceByProject = new Map<string, { self: number; partner: number }>()
+
     for (const r of dailyReports) {
       const arr = reportsByProject.get(r.projectId) ?? []
       arr.push(r)
       reportsByProject.set(r.projectId, arr)
+
+      const prev = workforceByProject.get(r.projectId) ?? { self: 0, partner: 0 }
+      const self = prev.self + (Number.isFinite(r.selfWorkersCount) ? (r.selfWorkersCount as number) : 0)
+      const partner =
+        prev.partner +
+        (r.partnerWorkers || []).reduce((sum, p) => sum + (Number.isFinite(p.workersCount) ? p.workersCount : 0), 0)
+      workforceByProject.set(r.projectId, { self, partner })
     }
 
     const visibleProjects = (() => {
@@ -137,6 +149,8 @@ export default function DashboardTab() {
       const projectExpenses = expenseByProject.get(p.id) ?? 0
       const reports = (reportsByProject.get(p.id) ?? []).slice().sort((a, b) => b.date.localeCompare(a.date))
       const latest = reports[0]
+
+      const wf = workforceByProject.get(p.id) ?? { self: 0, partner: 0 }
 
       const revenue = Number.isFinite(p.revenue) ? (p.revenue as number) : null
       const grossProfit = revenue !== null ? revenue - projectExpenses : null
@@ -161,6 +175,8 @@ export default function DashboardTab() {
         dailyReportCount: reports.length,
         latestWork: latest?.work ?? null,
         inputStatus,
+        selfWorkersTotal: wf.self,
+        partnerWorkersTotal: wf.partner,
       }
     })
   }, [projects, expenses, dailyReports, access?.kind, access?.role, memberProjectIds])
@@ -549,6 +565,12 @@ export default function DashboardTab() {
                 <StyledText variant="caption" color="secondary" numberOfLines={1}>
                   {kpi.inputStatus}
                 </StyledText>
+                {canSeeWorkforceTotals && (kpi.selfWorkersTotal > 0 || kpi.partnerWorkersTotal > 0) ? (
+                  <StyledText variant="caption" color="secondary" numberOfLines={1}>
+                    出面: 自社 {kpi.selfWorkersTotal}人
+                    {kpi.partnerWorkersTotal > 0 ? ` / 協力会社 ${kpi.partnerWorkersTotal}人` : ''}
+                  </StyledText>
+                ) : null}
               </View>
               <View style={styles.projectKpiRight}>
                 {isOwner ? (
