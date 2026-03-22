@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
+export type ReviewStatus = 'draft' | 'submitted' | 'approved'
+
 export type StoredDailyReport = {
   id: string
   projectId: string
@@ -8,6 +10,7 @@ export type StoredDailyReport = {
   workforceTime: string
   nextPlan: string
   memo?: string
+  reviewStatus: ReviewStatus
   createdAt: string
 }
 
@@ -22,9 +25,18 @@ const safeParse = <T>(raw: string | null, fallback: T): T => {
   }
 }
 
+const ensureReviewStatus = (v: any): ReviewStatus => {
+  if (v === 'submitted' || v === 'approved') return v
+  return 'draft'
+}
+
 export const listDailyReports = async (): Promise<StoredDailyReport[]> => {
   const raw = await AsyncStorage.getItem(DAILY_REPORTS_KEY)
-  return safeParse<StoredDailyReport[]>(raw, [])
+  const items = safeParse<any[]>(raw, [])
+  return items.map((r: any) => ({
+    ...r,
+    reviewStatus: ensureReviewStatus(r?.reviewStatus),
+  })) as StoredDailyReport[]
 }
 
 export const saveDailyReports = async (items: StoredDailyReport[]) => {
@@ -54,6 +66,7 @@ export const createDailyReport = async (params: {
     workforceTime: params.workforceTime,
     nextPlan: params.nextPlan,
     memo: params.memo?.trim() || undefined,
+    reviewStatus: 'draft',
     createdAt: now.toISOString(),
   }
 

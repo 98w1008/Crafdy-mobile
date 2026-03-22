@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export type ExpenseKind = 'receipt' | 'material' | 'subcontract' | 'expense'
 
+export type ReviewStatus = 'draft' | 'submitted' | 'approved'
+
 export type StoredExpense = {
   id: string
   projectId: string
@@ -9,6 +11,7 @@ export type StoredExpense = {
   amount: number
   memo: string
   date: string // YYYY-MM-DD
+  reviewStatus: ReviewStatus
   createdAt: string
 }
 
@@ -23,9 +26,18 @@ const safeParse = <T>(raw: string | null, fallback: T): T => {
   }
 }
 
+const ensureReviewStatus = (v: any): ReviewStatus => {
+  if (v === 'submitted' || v === 'approved') return v
+  return 'draft'
+}
+
 export const listExpenses = async (): Promise<StoredExpense[]> => {
   const raw = await AsyncStorage.getItem(EXPENSES_KEY)
-  return safeParse<StoredExpense[]>(raw, [])
+  const items = safeParse<any[]>(raw, [])
+  return items.map((e: any) => ({
+    ...e,
+    reviewStatus: ensureReviewStatus(e?.reviewStatus),
+  })) as StoredExpense[]
 }
 
 export const saveExpenses = async (items: StoredExpense[]) => {
@@ -53,6 +65,7 @@ export const createExpense = async (params: {
     amount: params.amount,
     memo: params.memo,
     date: params.date,
+    reviewStatus: 'draft',
     createdAt: now.toISOString(),
   }
 
