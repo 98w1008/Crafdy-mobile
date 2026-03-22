@@ -16,6 +16,7 @@ import { listProjects, StoredProject } from '@/lib/project-store'
 import { listExpenses, StoredExpense } from '@/lib/expense-store'
 import { listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
 import { listProjectIdsForMember } from '@/lib/project-membership-store'
+import { getApprovalMode, type ApprovalMode } from '@/lib/approval-mode-store'
 
 interface DashboardMetric {
   id: string
@@ -68,6 +69,7 @@ export default function DashboardTab() {
 
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [memberProjectIds, setMemberProjectIds] = useState<string[] | null>(null)
+  const [approvalMode, setApprovalModeState] = useState<ApprovalMode>('owneronly')
   const isUnassigned = access?.kind === 'unassigned'
   const isOwner = access?.kind === 'assigned' ? access.role === 'owner' : true
   const canSeeCompanySettings = access?.kind === 'assigned' && access.role === 'owner'
@@ -90,8 +92,9 @@ export default function DashboardTab() {
 
   useEffect(() => {
     ;(async () => {
-      const ctx = await getAccessContext()
+      const [ctx, mode] = await Promise.all([getAccessContext(), getApprovalMode()])
       setAccess(ctx)
+      setApprovalModeState(mode)
 
       if (ctx.kind === 'assigned' && ctx.role === 'member') {
         // NOTE: 最小実装（userIdは暫定で local-user 固定）
@@ -427,6 +430,73 @@ export default function DashboardTab() {
     )
   }
 
+  const canSeePendingReviews =
+    access?.kind === 'assigned' &&
+    (access.role === 'owner' || (access.role === 'office' && approvalMode === 'ownerplus_office'))
+
+  const pendingDailyReports = useMemo(() => {
+    if (!canSeePendingReviews) return [] as StoredDailyReport[]
+    return dailyReports.filter(r => r.reviewStatus === 'submitted')
+  }, [dailyReports, canSeePendingReviews])
+
+  const pendingExpenses = useMemo(() => {
+    if (!canSeePendingReviews) return [] as StoredExpense[]
+    return expenses.filter(e => e.reviewStatus === 'submitted')
+  }, [expenses, canSeePendingReviews])
+
+  const renderPendingReviewsCard = () => {
+    if (!canSeePendingReviews) return null
+
+    const items = [
+      ...pendingDailyReports.map(r => ({
+        key: `dr-${r.id}`,
+        type: '日報' as const,
+        projectId: r.projectId,
+        primary: `${r.date} / ${r.work}`,
+        secondary: '確認待ち',
+      })),
+      ...pendingExpenses.map(e => ({
+        key: `ex-${e.id}`,
+        type: '経費' as const,
+        projectId: e.projectId,
+        primary: `${e.kind} / ¥${(e.amount ?? 0).toLocaleString('ja-JP')}`,
+        secondary: '確認待ち',
+      })),
+    ]
+
+    const projectNameById = new Map(projects.map(p => [p.id, p.name]))
+    const count = items.length
+
+    return (
+      <Card variant="elevated" style={styles.pendingReviewsCard}>
+        <StyledText variant="subtitle" weight="semibold">確認待ち</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          submitted: {count}件
+        </StyledText>
+
+        {count === 0 ? (
+          <StyledText variant="body" color="secondary" style={{ marginTop: Spacing.sm }}>
+            確認待ちはありません。
+          </StyledText>
+        ) : (
+          <View style={{ marginTop: Spacing.sm, gap: 8 }}>
+            {items.slice(0, 6).map(it => (
+              <View key={it.key} style={styles.pendingRow}>
+                <StyledText variant="caption" weight="semibold">[{it.type}]</StyledText>
+                <StyledText variant="caption" color="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                  {projectNameById.get(it.projectId) || '（不明）'}
+                </StyledText>
+                <StyledText variant="caption" color="secondary" numberOfLines={1} style={{ flex: 2 }}>
+                  {it.primary}
+                </StyledText>
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
+    )
+  }
+
   const renderProjectKpis = () => (
     <Card variant="elevated" style={styles.projectKpiCard}>
       <View style={styles.projectKpiHeader}>
@@ -652,6 +722,7 @@ export default function DashboardTab() {
         >
           {renderWelcomeCard()}
           {renderCompanySettingsLink()}
+          {renderPendingReviewsCard()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
@@ -680,6 +751,8 @@ export default function DashboardTab() {
         {renderWelcomeCard()}
 
         {renderCompanySettingsLink()}
+
+        {renderPendingReviewsCard()}
 
         {renderJoinByCodeCard()}
 
@@ -725,6 +798,15 @@ const styles = StyleSheet.create({
   companySettingsCard: {
     marginBottom: Spacing.lg,
     padding: Spacing.md,
+  },
+  pendingReviewsCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   projectKpiCard: {
     marginBottom: Spacing.lg,
