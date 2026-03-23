@@ -76,6 +76,7 @@ export default function DashboardTab() {
   const isOwner = access?.kind === 'assigned' ? access.role === 'owner' : true
   const canSeeCompanySettings = access?.kind === 'assigned' && access.role === 'owner'
   const canSeeWorkforceTotals = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+  const canSeeWorkerAttendance = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
@@ -478,6 +479,79 @@ export default function DashboardTab() {
     return expenses.filter(e => e.reviewStatus === 'submitted')
   }, [expenses, canSeePendingReviews])
 
+  const currentYm = (() => {
+    // NOTE: 表示と集計で同じ「ローカル時刻のYYYY-MM」を使う（TZ境界のズレ回避）
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    return `${y}-${m}`
+  })()
+
+  const workerAttendanceRows = useMemo(() => {
+    if (!canSeeWorkerAttendance) return [] as { name: string; days: number }[]
+
+    const byKey = new Map<string, { name: string; dates: Set<string> }>()
+
+    for (const r of dailyReports) {
+      if (!r?.date || !String(r.date).startsWith(currentYm)) continue
+
+      const ids = (r.selfWorkerIds || []).filter(Boolean)
+      const names = (r.selfWorkerNames || []).filter(Boolean)
+
+      if (ids.length > 0) {
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i]
+          const name = names[i] || names[0] || id
+          const key = `id:${id}`
+          const prev = byKey.get(key) ?? { name, dates: new Set<string>() }
+          prev.dates.add(r.date)
+          byKey.set(key, prev)
+        }
+      } else if (names.length > 0) {
+        for (const name of names) {
+          const key = `name:${name}`
+          const prev = byKey.get(key) ?? { name, dates: new Set<string>() }
+          prev.dates.add(r.date)
+          byKey.set(key, prev)
+        }
+      }
+    }
+
+    const rows = Array.from(byKey.values()).map(v => ({ name: v.name, days: v.dates.size }))
+    rows.sort((a, b) => b.days - a.days)
+    return rows.slice(0, 5)
+  }, [dailyReports, canSeeWorkerAttendance, currentYm])
+
+  const renderWorkerAttendanceCard = () => {
+    if (!canSeeWorkerAttendance) return null
+
+    return (
+      <Card variant="elevated" style={styles.workerAttendanceCard}>
+        <StyledText variant="subtitle" weight="semibold">自社職人の今月出勤</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          対象月: {currentYm}
+        </StyledText>
+
+        {workerAttendanceRows.length === 0 ? (
+          <StyledText variant="body" color="secondary" style={{ marginTop: Spacing.sm }}>
+            まだ出勤データがありません。
+          </StyledText>
+        ) : (
+          <View style={{ marginTop: Spacing.sm, gap: 8 }}>
+            {workerAttendanceRows.map(r => (
+              <View key={r.name} style={styles.workerAttendanceRow}>
+                <StyledText variant="caption" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
+                  {r.name}
+                </StyledText>
+                <StyledText variant="caption" color="secondary">{r.days}日</StyledText>
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
+    )
+  }
+
   const renderPendingReviewsCard = () => {
     if (!canSeePendingReviews) return null
 
@@ -781,6 +855,7 @@ export default function DashboardTab() {
           {renderWelcomeCard()}
           {renderCompanySettingsLink()}
           {renderPendingReviewsCard()}
+          {renderWorkerAttendanceCard()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
@@ -811,6 +886,8 @@ export default function DashboardTab() {
         {renderCompanySettingsLink()}
 
         {renderPendingReviewsCard()}
+
+        {renderWorkerAttendanceCard()}
 
         {renderJoinByCodeCard()}
 
@@ -860,6 +937,16 @@ const styles = StyleSheet.create({
   pendingReviewsCard: {
     marginBottom: Spacing.lg,
     padding: Spacing.md,
+  },
+  workerAttendanceCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  workerAttendanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   pendingRow: {
     flexDirection: 'row',
