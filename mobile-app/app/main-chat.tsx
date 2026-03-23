@@ -20,6 +20,7 @@ import {
   submitDailyReport,
   type PartnerWorkerEntry,
 } from '@/lib/daily-report-store'
+import { createWorker, findWorkerByName } from '@/lib/worker-store'
 
 interface Message {
   id: string
@@ -37,6 +38,54 @@ type EmptyQuickAction = {
 }
 
 type IntentCategory = 'invoice' | 'estimate' | 'daily_report' | 'expense'
+
+const parseWorkerRegistration = (text: string): { name: string; dailyRate?: number } | null => {
+  // NOTE: 最小実装（曖昧な文では反応しない）
+  // 通す最小パターン:
+  // - 職人/職長 + 登録/追加
+  // - 登録/追加 + 日当
+  // - 名前 + 日当
+  // 想定: 「田中を職人登録」「職人に田中を追加」「佐々木を日当18000円で登録」「田中、日当20000円」
+  const hasWorkerWord = /(職人|職長)/.test(text)
+  const hasRegisterWord = /(登録|追加)/.test(text)
+
+  const rate = (() => {
+    const m = text.match(/日当\s*(\d{4,6})\s*(?:円)?/)
+    if (!m?.[1]) return undefined
+    const n = Number(m[1])
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    return Math.round(n)
+  })()
+
+  const name = (() => {
+    // 「職人に田中を追加」「田中を職人登録」
+    const m1 = text.match(/職人(?:に|を)?\s*([^\s、，,を]+)\s*(?:を)?\s*(?:追加|登録)/)
+    if (m1?.[1]) return m1[1]
+
+    // 「佐々木を日当18000円で登録」「田中を登録」
+    const m2 = text.match(/^([^\s、，,を]+)\s*(?:を)?\s*(?:.*?)(?:職人登録|登録|追加)/)
+    if (m2?.[1]) return m2[1]
+
+    // 「田中、日当20000円」
+    const m3 = text.match(/^([^\s、，,を]+)[、，,\s]*日当\s*\d{4,6}/)
+    if (m3?.[1]) return m3[1]
+
+    return ''
+  })().trim()
+
+  const shouldHandle =
+    (hasWorkerWord && hasRegisterWord) ||
+    (hasRegisterWord && typeof rate === 'number') ||
+    (!!name && typeof rate === 'number')
+
+  if (!shouldHandle) return null
+  if (!name) return null
+
+  // 過剰に拾わない（長文・文章は弾く）
+  if (name.length > 12) return null
+
+  return { name, dailyRate: rate }
+}
 
 type ExpenseCollected = {
   receiptConfirmed: boolean
@@ -1199,6 +1248,26 @@ export default function SimpleChatScreen() {
           setMessages(prev => [...prev, aiMessage])
         }
         setLastDraftTarget(null)
+      })()
+      return
+    }
+
+    // 職人登録（最小導線）
+    // NOTE: 将来日報に workerIds/workerNames を紐付ける前提の土台（今回は登録のみ）。
+    const workerReg = parseWorkerRegistration(trimmed)
+    if (workerReg) {
+      ;(async () => {
+        const existing = await findWorkerByName(workerReg.name)
+        const worker = existing || (await createWorker({ name: workerReg.name, dailyRate: workerReg.dailyRate }))
+
+        const rateText = worker.dailyRate ? `（日当¥${worker.dailyRate.toLocaleString('ja-JP')}）` : ''
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `OKです。${worker.name}さんを職人登録しました。${rateText}`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
       })()
       return
     }
