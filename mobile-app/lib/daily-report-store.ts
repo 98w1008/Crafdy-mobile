@@ -19,6 +19,9 @@ export type StoredDailyReport = {
   memo?: string
   selfWorkersCount?: number
   partnerWorkers?: PartnerWorkerEntry[]
+  // NOTE: 将来は selfWorkerIds を主にして、日報側で個人別出勤集計につなげる想定。
+  selfWorkerIds?: string[]
+  selfWorkerNames?: string[]
   expenseCheckStatus?: ExpenseCheckStatus
   reviewStatus: ReviewStatus
   createdAt: string
@@ -62,6 +65,11 @@ const ensureExpenseCheckStatus = (v: any): ExpenseCheckStatus => {
   return 'unknown'
 }
 
+const ensureStringArray = (v: any): string[] => {
+  if (!Array.isArray(v)) return []
+  return v.map(x => String(x || '').trim()).filter(Boolean)
+}
+
 export const listDailyReports = async (): Promise<StoredDailyReport[]> => {
   const raw = await AsyncStorage.getItem(DAILY_REPORTS_KEY)
   const items = safeParse<any[]>(raw, [])
@@ -69,6 +77,8 @@ export const listDailyReports = async (): Promise<StoredDailyReport[]> => {
     ...r,
     selfWorkersCount: ensureSelfWorkersCount(r?.selfWorkersCount),
     partnerWorkers: ensurePartnerWorkers(r?.partnerWorkers),
+    selfWorkerIds: ensureStringArray(r?.selfWorkerIds),
+    selfWorkerNames: ensureStringArray(r?.selfWorkerNames),
     expenseCheckStatus: ensureExpenseCheckStatus(r?.expenseCheckStatus),
     reviewStatus: ensureReviewStatus(r?.reviewStatus),
   })) as StoredDailyReport[]
@@ -92,6 +102,8 @@ export const createDailyReport = async (params: {
   memo?: string
   selfWorkersCount?: number
   partnerWorkers?: PartnerWorkerEntry[]
+  selfWorkerIds?: string[]
+  selfWorkerNames?: string[]
 }): Promise<StoredDailyReport> => {
   const items = await listDailyReports()
   const now = new Date()
@@ -105,6 +117,8 @@ export const createDailyReport = async (params: {
     memo: params.memo?.trim() || undefined,
     selfWorkersCount: typeof params.selfWorkersCount === 'number' ? params.selfWorkersCount : undefined,
     partnerWorkers: params.partnerWorkers?.length ? params.partnerWorkers : undefined,
+    selfWorkerIds: params.selfWorkerIds?.length ? params.selfWorkerIds : undefined,
+    selfWorkerNames: params.selfWorkerNames?.length ? params.selfWorkerNames : undefined,
     expenseCheckStatus: 'unknown',
     reviewStatus: 'draft',
     createdAt: now.toISOString(),

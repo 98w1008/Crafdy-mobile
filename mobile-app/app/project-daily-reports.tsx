@@ -23,6 +23,11 @@ const formatDemen = (r: StoredDailyReport) => {
   return parts.length ? `出面: ${parts.join(' / ')}` : ''
 }
 
+const formatSelfStaff = (r: StoredDailyReport) => {
+  const names = (r.selfWorkerNames || []).filter(Boolean)
+  return names.length ? `担当: ${names.join(' / ')}` : ''
+}
+
 export default function ProjectDailyReportsScreen() {
   const router = useRouter()
   const { projectId } = useLocalSearchParams<{ projectId?: string }>()
@@ -112,6 +117,7 @@ export default function ProjectDailyReportsScreen() {
                 </Text>
                 <Text style={styles.itemStatus}>状態: {reviewStatusLabel(r.reviewStatus)}</Text>
                 {formatDemen(r) ? <Text style={styles.itemStatus}>{formatDemen(r)}</Text> : null}
+                {formatSelfStaff(r) ? <Text style={styles.itemStatus}>{formatSelfStaff(r)}</Text> : null}
               </View>
             ))}
           </View>

@@ -20,7 +20,7 @@ import {
   submitDailyReport,
   type PartnerWorkerEntry,
 } from '@/lib/daily-report-store'
-import { createWorker, findWorkerByName } from '@/lib/worker-store'
+import { createWorker, findWorkerByName, listWorkers } from '@/lib/worker-store'
 
 interface Message {
   id: string
@@ -587,6 +587,22 @@ const parseDailyReportPartnerWorkers = (text: string): PartnerWorkerEntry[] => {
   }
 
   return out
+}
+
+const extractSelfWorkersFromText = async (text: string) => {
+  const workers = await listWorkers()
+  const hits = workers.filter(w => w.isActive !== false && w.name && text.includes(w.name))
+
+  const names: string[] = []
+  const ids: string[] = []
+  for (const w of hits) {
+    if (names.includes(w.name)) continue
+    names.push(w.name)
+    ids.push(w.id)
+    if (names.length >= 5) break
+  }
+
+  return { names, ids }
 }
 
 const isEstimateGenerateInstruction = (text: string) => {
@@ -1391,14 +1407,26 @@ export default function SimpleChatScreen() {
         }
 
         ;(async () => {
+          const staffText = [trimmed, normalized.work || '', normalized.nextPlan || ''].join(' ')
+          const selfStaff = await extractSelfWorkersFromText(staffText)
+
+          const inferredSelfCount =
+            typeof normalized.selfWorkersCount === 'number'
+              ? normalized.selfWorkersCount
+              : selfStaff.names.length > 0
+                ? selfStaff.names.length
+                : undefined
+
           const saved = await createDailyReport({
             projectId: selectedProject.id,
             date: normalized.date!,
             work: normalized.work!,
             workforceTime: normalized.workforceTime!,
             nextPlan: normalized.nextPlan!,
-            selfWorkersCount: normalized.selfWorkersCount,
+            selfWorkersCount: inferredSelfCount,
             partnerWorkers: normalized.partnerWorkers,
+            selfWorkerIds: selfStaff.ids,
+            selfWorkerNames: selfStaff.names,
           })
 
           setDailyReportDraft(defaultDailyReportDraft)
@@ -1415,9 +1443,14 @@ export default function SimpleChatScreen() {
             return parts.length ? `出面: ${parts.join(' / ')}` : ''
           })()
 
+          const selfStaffText = (() => {
+            const names = (saved.selfWorkerNames || []).filter(Boolean)
+            return names.length ? `担当: ${names.slice(0, 5).join(' / ')}` : ''
+          })()
+
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。${demenText ? `\n${demenText}` : ''}\n経費が無ければ「経費なし」と送ってください。\n確認依頼する場合は「確認依頼」と送ってください。`,
+            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。${demenText ? `\n${demenText}` : ''}${selfStaffText ? `\n${selfStaffText}` : ''}\n経費が無ければ「経費なし」と送ってください。\n確認依頼する場合は「確認依頼」と送ってください。`,
             sender: 'ai',
             timestamp: new Date(),
           }
