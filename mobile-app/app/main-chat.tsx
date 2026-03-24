@@ -21,6 +21,7 @@ import {
   type PartnerWorkerEntry,
 } from '@/lib/daily-report-store'
 import { createWorker, findWorkerByName, listWorkers } from '@/lib/worker-store'
+import { createPartnerCompany, findPartnerCompanyByName } from '@/lib/partner-company-store'
 
 interface Message {
   id: string
@@ -85,6 +86,56 @@ const parseWorkerRegistration = (text: string): { name: string; dailyRate?: numb
   if (name.length > 12) return null
 
   return { name, dailyRate: rate }
+}
+
+const parsePartnerCompanyRegistration = (text: string): { name: string; workerDailyRate?: number } | null => {
+  // NOTE: 最小実装（曖昧な文では反応しない）
+  // 通す最小パターン:
+  // - 協力会社 + 登録/追加
+  // - 登録/追加 + 人工単価
+  // - 名前 + 人工単価
+  // 想定: 「〇〇工業を協力会社登録」「〇〇工業を協力会社に追加」「〇〇工業、人工単価25000円で登録」「△△防水を人工単価23000円で追加」
+  const hasPartnerWord = /(協力会社)/.test(text)
+  const hasRegisterWord = /(登録|追加)/.test(text)
+
+  const rate = (() => {
+    const m = text.match(/(?:人工単価|単価)\s*(\d{4,6})\s*(?:円)?/)
+    if (!m?.[1]) return undefined
+    const n = Number(m[1])
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    return Math.round(n)
+  })()
+
+  const name = (() => {
+    // 「〇〇工業を協力会社登録」「〇〇工業を協力会社に追加」
+    const m1 = text.match(/^([^\s、，,を]+)\s*(?:を)?\s*協力会社(?:に)?\s*(?:追加|登録)/)
+    if (m1?.[1]) return m1[1]
+
+    // 「協力会社 〇〇工業 追加」
+    const m2 = text.match(/協力会社(?:に|を)?\s*([^\s、，,を]+)\s*(?:を)?\s*(?:追加|登録)/)
+    if (m2?.[1]) return m2[1]
+
+    // 「〇〇工業、人工単価25000円で登録」「△△防水を人工単価23000円で追加」
+    const m3 = text.match(/^([^\s、，,を]+)[、，,\s]*(?:を)?\s*(?:人工単価|単価)\s*\d{4,6}/)
+    if (m3?.[1]) return m3[1]
+
+    // 「〇〇工業を登録」「〇〇工業を追加」
+    const m4 = text.match(/^([^\s、，,を]+)\s*(?:を)?\s*(?:.*?)(?:登録|追加)/)
+    if (m4?.[1]) return m4[1]
+
+    return ''
+  })().trim()
+
+  const shouldHandle =
+    (hasPartnerWord && hasRegisterWord) ||
+    (hasRegisterWord && typeof rate === 'number') ||
+    (!!name && typeof rate === 'number')
+
+  if (!shouldHandle) return null
+  if (!name) return null
+  if (name.length > 24) return null
+
+  return { name, workerDailyRate: rate }
 }
 
 type ExpenseCollected = {
@@ -1264,6 +1315,30 @@ export default function SimpleChatScreen() {
           setMessages(prev => [...prev, aiMessage])
         }
         setLastDraftTarget(null)
+      })()
+      return
+    }
+
+    // 協力会社登録（最小導線）
+    // NOTE: 将来日報の partnerWorkers を partnerCompanyIds に紐付ける前提の土台（今回は登録のみ）。
+    const partnerReg = parsePartnerCompanyRegistration(trimmed)
+    if (partnerReg) {
+      ;(async () => {
+        const existing = await findPartnerCompanyByName(partnerReg.name)
+        const company =
+          existing ||
+          (await createPartnerCompany({ name: partnerReg.name, workerDailyRate: partnerReg.workerDailyRate }))
+
+        const rateText = company.workerDailyRate
+          ? `（人工単価¥${company.workerDailyRate.toLocaleString('ja-JP')}）`
+          : ''
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `OKです。${company.name}を協力会社登録しました。${rateText}`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
       })()
       return
     }
