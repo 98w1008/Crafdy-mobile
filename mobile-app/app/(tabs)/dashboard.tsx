@@ -77,6 +77,7 @@ export default function DashboardTab() {
   const canSeeCompanySettings = access?.kind === 'assigned' && access.role === 'owner'
   const canSeeWorkforceTotals = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeWorkerAttendance = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+  const canSeePartnerWorkforce = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
@@ -552,6 +553,66 @@ export default function DashboardTab() {
     )
   }
 
+  const partnerWorkforceRows = useMemo(() => {
+    if (!canSeePartnerWorkforce) return [] as { key: string; name: string; workersTotal: number }[]
+
+    const byKey = new Map<string, { key: string; name: string; workersTotal: number }>()
+
+    for (const r of dailyReports) {
+      if (!r?.date || !String(r.date).startsWith(currentYm)) continue
+      if (!Array.isArray(r.partnerWorkers) || r.partnerWorkers.length === 0) continue
+
+      for (const pw of r.partnerWorkers) {
+        const name = String(pw?.companyName || '').trim()
+        if (!name) continue
+
+        const n = Number(pw?.workersCount)
+        if (!Number.isFinite(n) || n <= 0) continue
+
+        const id = pw?.partnerCompanyId ? String(pw.partnerCompanyId).trim() : ''
+        const key = id ? `id:${id}` : `name:${name}`
+
+        const prev = byKey.get(key) ?? { key, name, workersTotal: 0 }
+        prev.workersTotal += Math.floor(n)
+        byKey.set(key, prev)
+      }
+    }
+
+    const rows = Array.from(byKey.values())
+    rows.sort((a, b) => b.workersTotal - a.workersTotal)
+    return rows.slice(0, 5)
+  }, [dailyReports, canSeePartnerWorkforce, currentYm])
+
+  const renderPartnerWorkforceCard = () => {
+    if (!canSeePartnerWorkforce) return null
+
+    return (
+      <Card variant="elevated" style={styles.partnerWorkforceCard}>
+        <StyledText variant="subtitle" weight="semibold">協力会社の今月人工</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          対象月: {currentYm}
+        </StyledText>
+
+        {partnerWorkforceRows.length === 0 ? (
+          <StyledText variant="body" color="secondary" style={{ marginTop: Spacing.sm }}>
+            まだ協力会社データがありません。
+          </StyledText>
+        ) : (
+          <View style={{ marginTop: Spacing.sm, gap: 8 }}>
+            {partnerWorkforceRows.map(r => (
+              <View key={r.key} style={styles.partnerWorkforceRow}>
+                <StyledText variant="caption" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
+                  {r.name}
+                </StyledText>
+                <StyledText variant="caption" color="secondary">{r.workersTotal}人工</StyledText>
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
+    )
+  }
+
   const renderPendingReviewsCard = () => {
     if (!canSeePendingReviews) return null
 
@@ -856,6 +917,7 @@ export default function DashboardTab() {
           {renderCompanySettingsLink()}
           {renderPendingReviewsCard()}
           {renderWorkerAttendanceCard()}
+          {renderPartnerWorkforceCard()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
@@ -888,6 +950,7 @@ export default function DashboardTab() {
         {renderPendingReviewsCard()}
 
         {renderWorkerAttendanceCard()}
+        {renderPartnerWorkforceCard()}
 
         {renderJoinByCodeCard()}
 
@@ -943,6 +1006,16 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   workerAttendanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  partnerWorkforceCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  partnerWorkforceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
