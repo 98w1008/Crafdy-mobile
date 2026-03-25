@@ -5,6 +5,7 @@ export type ReviewStatus = 'draft' | 'submitted' | 'approved'
 export type PartnerWorkerEntry = {
   companyName: string
   workersCount: number
+  partnerCompanyId?: string
 }
 
 export type ExpenseCheckStatus = 'unknown' | 'none'
@@ -55,9 +56,14 @@ const ensurePartnerWorkers = (v: any): PartnerWorkerEntry[] => {
     .map((x: any) => ({
       companyName: String(x?.companyName || '').trim(),
       workersCount: Number(x?.workersCount),
+      partnerCompanyId: x?.partnerCompanyId ? String(x.partnerCompanyId).trim() : undefined,
     }))
     .filter(x => x.companyName && Number.isFinite(x.workersCount) && x.workersCount > 0)
-    .map(x => ({ ...x, workersCount: Math.floor(x.workersCount) }))
+    .map(x => ({
+      ...x,
+      workersCount: Math.floor(x.workersCount),
+      partnerCompanyId: x.partnerCompanyId || undefined,
+    }))
 }
 
 const ensureExpenseCheckStatus = (v: any): ExpenseCheckStatus => {

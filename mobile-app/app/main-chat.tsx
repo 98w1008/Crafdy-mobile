@@ -21,7 +21,11 @@ import {
   type PartnerWorkerEntry,
 } from '@/lib/daily-report-store'
 import { createWorker, findWorkerByName, listWorkers } from '@/lib/worker-store'
-import { createPartnerCompany, findPartnerCompanyByName } from '@/lib/partner-company-store'
+import {
+  createPartnerCompany,
+  findPartnerCompanyByName,
+  listPartnerCompanies,
+} from '@/lib/partner-company-store'
 
 interface Message {
   id: string
@@ -1492,6 +1496,14 @@ export default function SimpleChatScreen() {
                 ? selfStaff.names.length
                 : undefined
 
+          const companies = await listPartnerCompanies()
+          const companyIdByName = new Map(companies.map(c => [c.name.trim(), c.id]))
+
+          const partnerWorkers = (normalized.partnerWorkers || []).map(p => ({
+            ...p,
+            partnerCompanyId: companyIdByName.get((p.companyName || '').trim()),
+          }))
+
           const saved = await createDailyReport({
             projectId: selectedProject.id,
             date: normalized.date!,
@@ -1499,7 +1511,7 @@ export default function SimpleChatScreen() {
             workforceTime: normalized.workforceTime!,
             nextPlan: normalized.nextPlan!,
             selfWorkersCount: inferredSelfCount,
-            partnerWorkers: normalized.partnerWorkers,
+            partnerWorkers,
             selfWorkerIds: selfStaff.ids,
             selfWorkerNames: selfStaff.names,
           })
