@@ -15,6 +15,7 @@ import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
 import { listProjects, StoredProject } from '@/lib/project-store'
 import { approveExpense, listExpenses, StoredExpense } from '@/lib/expense-store'
 import { approveDailyReport, listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
+import { listSupportRates, SupportRate } from '@/lib/support-rate-store'
 import { listProjectIdsForMember } from '@/lib/project-membership-store'
 import { getApprovalMode, type ApprovalMode } from '@/lib/approval-mode-store'
 
@@ -68,6 +69,7 @@ export default function DashboardTab() {
   const [projects, setProjects] = useState<StoredProject[]>([])
   const [expenses, setExpenses] = useState<StoredExpense[]>([])
   const [dailyReports, setDailyReports] = useState<StoredDailyReport[]>([])
+  const [supportRates, setSupportRates] = useState<SupportRate[]>([])
 
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [memberProjectIds, setMemberProjectIds] = useState<string[] | null>(null)
@@ -79,13 +81,20 @@ export default function DashboardTab() {
   const canSeeWorkerAttendance = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeePartnerWorkforce = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeSupportSummary = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+  const canSeeSupportBillingCandidates = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
-      const [p, e, r] = await Promise.all([listProjects(), listExpenses(), listDailyReports()])
+      const [p, e, r, sr] = await Promise.all([
+        listProjects(),
+        listExpenses(),
+        listDailyReports(),
+        listSupportRates(),
+      ])
       setProjects(p)
       setExpenses(e)
       setDailyReports(r)
+      setSupportRates(sr)
     } catch (err) {
       console.error('Failed to load dashboard data', err)
     }
@@ -674,6 +683,125 @@ export default function DashboardTab() {
     )
   }
 
+  const supportBillingRows = useMemo(() => {
+    if (!canSeeSupportBillingCandidates) {
+      return [] as {
+        key: string
+        companyName: string
+        reportCount: number
+        jyouyouWorkersTotal: number
+        ouenWorkersTotal: number
+        candidateTotal: number
+        rateMissing: boolean
+      }[]
+    }
+
+    const byCompany = new Map<
+      string,
+      {
+        key: string
+        companyName: string
+        reportCount: number
+        jyouyouWorkersTotal: number
+        ouenWorkersTotal: number
+      }
+    >()
+
+    for (const r of dailyReports) {
+      if (!r?.date || !String(r.date).startsWith(currentYm)) continue
+      if (r?.reportKind !== 'support') continue
+
+      const companyName = String(r?.supportCompanyName || '').trim()
+      if (!companyName) continue
+
+      const supportType = r?.supportType
+      if (supportType !== 'jyouyou' && supportType !== 'ouen') continue
+
+      const self = Number.isFinite(r?.selfWorkersCount) ? (r.selfWorkersCount as number) : 0
+      const workers = Math.max(0, Math.floor(self))
+
+      const prev = byCompany.get(companyName) ?? {
+        key: companyName,
+        companyName,
+        reportCount: 0,
+        jyouyouWorkersTotal: 0,
+        ouenWorkersTotal: 0,
+      }
+
+      prev.reportCount += 1
+      if (supportType === 'jyouyou') prev.jyouyouWorkersTotal += workers
+      else prev.ouenWorkersTotal += workers
+
+      byCompany.set(companyName, prev)
+    }
+
+    const rateByCompany = new Map(supportRates.map(r => [r.companyName.trim(), r]))
+
+    const rows = Array.from(byCompany.values()).map(v => {
+      const rate = rateByCompany.get(v.companyName)
+      const jRate = typeof rate?.jyouyouDailyRate === 'number' ? rate.jyouyouDailyRate : 0
+      const oRate = typeof rate?.ouenDailyRate === 'number' ? rate.ouenDailyRate : 0
+
+      const jyouyouSubtotal = v.jyouyouWorkersTotal * jRate
+      const ouenSubtotal = v.ouenWorkersTotal * oRate
+      const candidateTotal = jyouyouSubtotal + ouenSubtotal
+
+      const rateMissing = jRate === 0 && oRate === 0
+
+      return {
+        ...v,
+        candidateTotal,
+        rateMissing,
+      }
+    })
+
+    rows.sort((a, b) => {
+      if (b.candidateTotal !== a.candidateTotal) return b.candidateTotal - a.candidateTotal
+      return b.reportCount - a.reportCount
+    })
+
+    return rows.slice(0, 5)
+  }, [dailyReports, supportRates, canSeeSupportBillingCandidates, currentYm])
+
+  const renderSupportBillingCandidatesCard = () => {
+    if (!canSeeSupportBillingCandidates) return null
+
+    return (
+      <Card variant="elevated" style={styles.supportBillingCard}>
+        <StyledText variant="subtitle" weight="semibold">常用・応援の請求候補</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          対象月: {currentYm}
+        </StyledText>
+
+        {supportBillingRows.length === 0 ? (
+          <StyledText variant="body" color="secondary" style={{ marginTop: Spacing.sm }}>
+            まだ常用・応援データがありません。
+          </StyledText>
+        ) : (
+          <View style={{ marginTop: Spacing.sm, gap: 8 }}>
+            {supportBillingRows.map(r => (
+              <View key={r.key} style={styles.supportBillingRow}>
+                <View style={{ flex: 1 }}>
+                  <StyledText variant="caption" weight="semibold" numberOfLines={1}>
+                    {r.companyName}
+                  </StyledText>
+                  <StyledText variant="caption" color="secondary" numberOfLines={1}>
+                    常用{r.jyouyouWorkersTotal}人工 / 応援{r.ouenWorkersTotal}人工
+                  </StyledText>
+                </View>
+                <StyledText variant="caption" color="secondary">
+                  {r.rateMissing
+                    ? '単価未設定'
+                    : `候補 ¥${r.candidateTotal.toLocaleString('ja-JP')}`}
+                </StyledText>
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
+    )
+  }
+
   const renderPendingReviewsCard = () => {
     if (!canSeePendingReviews) return null
 
@@ -980,6 +1108,7 @@ export default function DashboardTab() {
           {renderWorkerAttendanceCard()}
           {renderPartnerWorkforceCard()}
           {renderSupportSummaryCard()}
+          {renderSupportBillingCandidatesCard()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
@@ -1014,6 +1143,7 @@ export default function DashboardTab() {
         {renderWorkerAttendanceCard()}
         {renderPartnerWorkforceCard()}
         {renderSupportSummaryCard()}
+        {renderSupportBillingCandidatesCard()}
 
         {renderJoinByCodeCard()}
 
@@ -1089,6 +1219,16 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   supportSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  supportBillingCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  supportBillingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
