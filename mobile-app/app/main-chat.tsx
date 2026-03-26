@@ -28,7 +28,8 @@ import {
 } from '@/lib/partner-company-store'
 import { listSupportRates, upsertSupportRate } from '@/lib/support-rate-store'
 import { listDailyReports } from '@/lib/daily-report-store'
-import { createOrReplaceSupportBillingDraft } from '@/lib/support-billing-draft-store'
+import { createOrReplaceSupportBillingDraft, listSupportBillingDrafts } from '@/lib/support-billing-draft-store'
+import { createOrReplaceSupportInvoiceDraft } from '@/lib/support-invoice-draft-store'
 
 interface Message {
   id: string
@@ -314,6 +315,32 @@ const parseSupportBillingDraftCommand = (text: string): { companyName: string; y
     if (m1?.[1]) return m1[1]
 
     const m2 = text.match(/^([^\s、，,をにの]+)\s+(?:今月)?\s*請求候補/)
+    if (m2?.[1]) return m2[1]
+
+    return ''
+  })().trim()
+
+  if (!companyName) return null
+  if (companyName.length > 24) return null
+
+  // NOTE: ym指定は将来。今回は「今月」のみ。
+  return { companyName }
+}
+
+const parseSupportInvoiceDraftCommand = (text: string): { companyName: string; ym?: string } | null => {
+  // NOTE: 最小実装（曖昧なら既存導線へ流す）
+  // 想定:
+  // - 「△△建設の今月請求書下書きを作成」
+  // - 「△△建設の請求書下書きを作って」
+  // - 「△△建設 今月請求書下書き」
+  // - 「〇〇工務店の請求書下書きを作成」
+  if (!/(請求書下書き)/.test(text)) return null
+
+  const companyName = (() => {
+    const m1 = text.match(/^([^\s、，,をにの]+)\s*(?:の)?\s*(?:今月)?\s*請求書下書き/)
+    if (m1?.[1]) return m1[1]
+
+    const m2 = text.match(/^([^\s、，,をにの]+)\s+(?:今月)?\s*請求書下書き/)
     if (m2?.[1]) return m2[1]
 
     return ''
@@ -1581,6 +1608,83 @@ export default function SimpleChatScreen() {
           text: rateMissing
             ? `OKです。${saved.companyName}の今月請求候補を作成しました。単価未設定のため候補金額は0円です。`
             : `OKです。${saved.companyName}の今月請求候補を作成しました。常用${saved.jyouyouWorkersTotal}人工 / 応援${saved.ouenWorkersTotal}人工 / 候補¥${saved.candidateTotal.toLocaleString('ja-JP')}です。`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+      })()
+      return
+    }
+
+    // 常用・応援の請求書下書き（billing draft → invoice draft）
+    const supportInvoiceCmd = parseSupportInvoiceDraftCommand(trimmed)
+    if (supportInvoiceCmd) {
+      ;(async () => {
+        const now = new Date()
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+        const drafts = await listSupportBillingDrafts()
+        const billing = drafts.find(d => d.companyName.trim() === supportInvoiceCmd.companyName && d.ym.trim() === ym)
+
+        if (!billing) {
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `先に${supportInvoiceCmd.companyName}の今月請求候補を作成してください。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        const lines: {
+          label: string
+          quantity: number
+          unitPrice: number
+          amount: number
+        }[] = []
+
+        if (
+          billing.jyouyouWorkersTotal > 0 &&
+          typeof billing.jyouyouDailyRate === 'number' &&
+          billing.jyouyouDailyRate > 0
+        ) {
+          const quantity = billing.jyouyouWorkersTotal
+          const unitPrice = billing.jyouyouDailyRate
+          lines.push({ label: '常用', quantity, unitPrice, amount: quantity * unitPrice })
+        }
+
+        if (billing.ouenWorkersTotal > 0 && typeof billing.ouenDailyRate === 'number' && billing.ouenDailyRate > 0) {
+          const quantity = billing.ouenWorkersTotal
+          const unitPrice = billing.ouenDailyRate
+          lines.push({ label: '応援', quantity, unitPrice, amount: quantity * unitPrice })
+        }
+
+        if (lines.length === 0) {
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: '単価未設定のため、請求書下書きの明細を作れませんでした。先に単価を登録してください。',
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        const subtotal = lines.reduce((sum, l) => sum + l.amount, 0)
+        const title = `${billing.companyName} ${billing.ym} 請求書下書き`
+
+        const saved = await createOrReplaceSupportInvoiceDraft({
+          companyName: billing.companyName,
+          ym: billing.ym,
+          title,
+          lines,
+          subtotal,
+        })
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `OKです。${saved.companyName}の今月請求書下書きを作成しました。常用${billing.jyouyouWorkersTotal}人工 / 応援${billing.ouenWorkersTotal}人工 / 小計¥${saved.subtotal.toLocaleString('ja-JP')}です。`,
           sender: 'ai',
           timestamp: new Date(),
         }
