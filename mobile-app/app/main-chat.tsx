@@ -26,7 +26,9 @@ import {
   findPartnerCompanyByName,
   listPartnerCompanies,
 } from '@/lib/partner-company-store'
-import { upsertSupportRate } from '@/lib/support-rate-store'
+import { listSupportRates, upsertSupportRate } from '@/lib/support-rate-store'
+import { listDailyReports } from '@/lib/daily-report-store'
+import { createOrReplaceSupportBillingDraft } from '@/lib/support-billing-draft-store'
 
 interface Message {
   id: string
@@ -296,6 +298,32 @@ const parseSupportRateRegistration = (
   if (companyName.length > 24) return null
 
   return { companyName, jyouyouDailyRate: jyouyou, ouenDailyRate: ouen }
+}
+
+const parseSupportBillingDraftCommand = (text: string): { companyName: string; ym?: string } | null => {
+  // NOTE: 最小実装（曖昧なら既存導線へ流す）
+  // 想定:
+  // - 「△△建設の今月請求候補を作成」
+  // - 「△△建設の請求候補を作って」
+  // - 「△△建設 今月請求候補」
+  // - 「〇〇工務店の常用・応援請求候補を作成」
+  if (!/(請求候補)/.test(text)) return null
+
+  const companyName = (() => {
+    const m1 = text.match(/^([^\s、，,をにの]+)\s*(?:の)?\s*(?:今月)?\s*請求候補/)
+    if (m1?.[1]) return m1[1]
+
+    const m2 = text.match(/^([^\s、，,をにの]+)\s+(?:今月)?\s*請求候補/)
+    if (m2?.[1]) return m2[1]
+
+    return ''
+  })().trim()
+
+  if (!companyName) return null
+  if (companyName.length > 24) return null
+
+  // NOTE: ym指定は将来。今回は「今月」のみ。
+  return { companyName }
 }
 
 type ExpenseCollected = {
@@ -1479,6 +1507,84 @@ export default function SimpleChatScreen() {
           setMessages(prev => [...prev, aiMessage])
         }
         setLastDraftTarget(null)
+      })()
+      return
+    }
+
+    // 常用・応援の請求候補（下書き作成）
+    const supportBillingCmd = parseSupportBillingDraftCommand(trimmed)
+    if (supportBillingCmd) {
+      ;(async () => {
+        const now = new Date()
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+        const reports = await listDailyReports()
+        const targets = reports.filter(r => {
+          if (!r?.date || !String(r.date).startsWith(ym)) return false
+          if (r?.reportKind !== 'support') return false
+          const name = String(r?.supportCompanyName || '').trim()
+          return name === supportBillingCmd.companyName
+        })
+
+        if (targets.length === 0) {
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `今月の${supportBillingCmd.companyName}の常用・応援データがありません。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        let reportCount = 0
+        let jyouyouWorkersTotal = 0
+        let ouenWorkersTotal = 0
+
+        for (const r of targets) {
+          const supportType = r?.supportType
+          if (supportType !== 'jyouyou' && supportType !== 'ouen') continue
+
+          const self = Number.isFinite(r?.selfWorkersCount) ? (r.selfWorkersCount as number) : 0
+          const workers = Math.max(0, Math.floor(self))
+
+          reportCount += 1
+          if (supportType === 'jyouyou') jyouyouWorkersTotal += workers
+          else ouenWorkersTotal += workers
+        }
+
+        const rates = await listSupportRates()
+        const rate = rates.find(r => r.companyName.trim() === supportBillingCmd.companyName)
+
+        const jRate = typeof rate?.jyouyouDailyRate === 'number' ? rate.jyouyouDailyRate : undefined
+        const oRate = typeof rate?.ouenDailyRate === 'number' ? rate.ouenDailyRate : undefined
+
+        const candidateTotal =
+          (jRate ? jyouyouWorkersTotal * jRate : 0) +
+          (oRate ? ouenWorkersTotal * oRate : 0)
+
+        const saved = await createOrReplaceSupportBillingDraft({
+          companyName: supportBillingCmd.companyName,
+          ym,
+          reportCount,
+          jyouyouWorkersTotal,
+          ouenWorkersTotal,
+          jyouyouDailyRate: jRate,
+          ouenDailyRate: oRate,
+          candidateTotal,
+        })
+
+        const rateMissing = !jRate && !oRate
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: rateMissing
+            ? `OKです。${saved.companyName}の今月請求候補を作成しました。単価未設定のため候補金額は0円です。`
+            : `OKです。${saved.companyName}の今月請求候補を作成しました。常用${saved.jyouyouWorkersTotal}人工 / 応援${saved.ouenWorkersTotal}人工 / 候補¥${saved.candidateTotal.toLocaleString('ja-JP')}です。`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
       })()
       return
     }
