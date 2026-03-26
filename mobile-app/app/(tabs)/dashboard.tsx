@@ -78,6 +78,7 @@ export default function DashboardTab() {
   const canSeeWorkforceTotals = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeWorkerAttendance = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeePartnerWorkforce = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+  const canSeeSupportSummary = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
@@ -613,6 +614,66 @@ export default function DashboardTab() {
     )
   }
 
+  const supportSummaryRows = useMemo(() => {
+    if (!canSeeSupportSummary) return [] as { key: string; companyName: string; reportCount: number; selfWorkersTotal: number }[]
+
+    const byCompany = new Map<string, { key: string; companyName: string; reportCount: number; selfWorkersTotal: number }>()
+
+    for (const r of dailyReports) {
+      if (!r?.date || !String(r.date).startsWith(currentYm)) continue
+      if (r?.reportKind !== 'support') continue
+
+      const companyName = String(r?.supportCompanyName || '').trim()
+      if (!companyName) continue
+
+      const prev = byCompany.get(companyName) ?? { key: companyName, companyName, reportCount: 0, selfWorkersTotal: 0 }
+      prev.reportCount += 1
+      const self = Number.isFinite(r?.selfWorkersCount) ? (r.selfWorkersCount as number) : 0
+      prev.selfWorkersTotal += Math.max(0, Math.floor(self))
+      byCompany.set(companyName, prev)
+    }
+
+    const rows = Array.from(byCompany.values())
+    rows.sort((a, b) => {
+      if (b.reportCount !== a.reportCount) return b.reportCount - a.reportCount
+      return b.selfWorkersTotal - a.selfWorkersTotal
+    })
+
+    return rows.slice(0, 5)
+  }, [dailyReports, canSeeSupportSummary, currentYm])
+
+  const renderSupportSummaryCard = () => {
+    if (!canSeeSupportSummary) return null
+
+    return (
+      <Card variant="elevated" style={styles.supportSummaryCard}>
+        <StyledText variant="subtitle" weight="semibold">常用・応援の今月サマリ</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          対象月: {currentYm}
+        </StyledText>
+
+        {supportSummaryRows.length === 0 ? (
+          <StyledText variant="body" color="secondary" style={{ marginTop: Spacing.sm }}>
+            まだ常用・応援データがありません。
+          </StyledText>
+        ) : (
+          <View style={{ marginTop: Spacing.sm, gap: 8 }}>
+            {supportSummaryRows.map(r => (
+              <View key={r.key} style={styles.supportSummaryRow}>
+                <StyledText variant="caption" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
+                  {r.companyName}
+                </StyledText>
+                <StyledText variant="caption" color="secondary">
+                  {r.reportCount}件 / 自社{r.selfWorkersTotal}人工
+                </StyledText>
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
+    )
+  }
+
   const renderPendingReviewsCard = () => {
     if (!canSeePendingReviews) return null
 
@@ -918,6 +979,7 @@ export default function DashboardTab() {
           {renderPendingReviewsCard()}
           {renderWorkerAttendanceCard()}
           {renderPartnerWorkforceCard()}
+          {renderSupportSummaryCard()}
           {renderQuickActions()}
           {renderRecentActivity()}
         </ScrollView>
@@ -951,6 +1013,7 @@ export default function DashboardTab() {
 
         {renderWorkerAttendanceCard()}
         {renderPartnerWorkforceCard()}
+        {renderSupportSummaryCard()}
 
         {renderJoinByCodeCard()}
 
@@ -1016,6 +1079,16 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   partnerWorkforceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  supportSummaryCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  supportSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
