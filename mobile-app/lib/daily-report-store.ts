@@ -10,6 +10,9 @@ export type PartnerWorkerEntry = {
 
 export type ExpenseCheckStatus = 'unknown' | 'none'
 
+export type ReportKind = 'project' | 'support'
+export type SupportType = 'jyouyou' | 'ouen'
+
 export type StoredDailyReport = {
   id: string
   projectId: string
@@ -26,6 +29,12 @@ export type StoredDailyReport = {
   expenseCheckStatus?: ExpenseCheckStatus
   reviewStatus: ReviewStatus
   createdAt: string
+
+  // NOTE: reportKind='support' は将来の「常用・応援日報」導線で利用する。
+  // support 日報は将来、請求候補算出や高速代の扱い等につなげる想定（今回は保持のみ）。
+  reportKind?: ReportKind
+  supportCompanyName?: string
+  supportType?: SupportType
 }
 
 const DAILY_REPORTS_KEY = 'daily_reports_v1'
@@ -42,6 +51,21 @@ const safeParse = <T>(raw: string | null, fallback: T): T => {
 const ensureReviewStatus = (v: any): ReviewStatus => {
   if (v === 'submitted' || v === 'approved') return v
   return 'draft'
+}
+
+const ensureReportKind = (v: any): ReportKind => {
+  if (v === 'support') return 'support'
+  return 'project'
+}
+
+const ensureSupportCompanyName = (v: any): string | undefined => {
+  const s = String(v || '').trim()
+  return s ? s : undefined
+}
+
+const ensureSupportType = (v: any): SupportType | undefined => {
+  if (v === 'jyouyou' || v === 'ouen') return v
+  return undefined
 }
 
 const ensureSelfWorkersCount = (v: any): number | undefined => {
@@ -87,6 +111,11 @@ export const listDailyReports = async (): Promise<StoredDailyReport[]> => {
     selfWorkerNames: ensureStringArray(r?.selfWorkerNames),
     expenseCheckStatus: ensureExpenseCheckStatus(r?.expenseCheckStatus),
     reviewStatus: ensureReviewStatus(r?.reviewStatus),
+
+    // 後方互換: 既存データは reportKind がないため project 扱いに補完する
+    reportKind: ensureReportKind(r?.reportKind),
+    supportCompanyName: ensureSupportCompanyName(r?.supportCompanyName),
+    supportType: ensureSupportType(r?.supportType),
   })) as StoredDailyReport[]
 }
 
@@ -110,6 +139,10 @@ export const createDailyReport = async (params: {
   partnerWorkers?: PartnerWorkerEntry[]
   selfWorkerIds?: string[]
   selfWorkerNames?: string[]
+
+  reportKind?: ReportKind
+  supportCompanyName?: string
+  supportType?: SupportType
 }): Promise<StoredDailyReport> => {
   const items = await listDailyReports()
   const now = new Date()
@@ -128,6 +161,10 @@ export const createDailyReport = async (params: {
     expenseCheckStatus: 'unknown',
     reviewStatus: 'draft',
     createdAt: now.toISOString(),
+
+    reportKind: params.reportKind ?? 'project',
+    supportCompanyName: params.supportCompanyName?.trim() || undefined,
+    supportType: params.supportType === 'jyouyou' || params.supportType === 'ouen' ? params.supportType : undefined,
   }
 
   await saveDailyReports([report, ...items])
