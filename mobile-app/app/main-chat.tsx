@@ -142,6 +142,43 @@ const parsePartnerCompanyRegistration = (text: string): { name: string; workerDa
   return { name, workerDailyRate: rate }
 }
 
+const parseSupportDailyReportMeta = (
+  text: string
+): { companyName: string; supportType: 'jyouyou' | 'ouen' } | null => {
+  // NOTE: 最小実装（曖昧なら既存導線へ流す）
+  // 想定:
+  // - 「今日は△△建設の応援」
+  // - 「〇〇工務店 常用」
+  // - 「△△建設に応援」
+  // - 「〇〇工務店の常用で田中」
+  const hasOuen = /(応援)/.test(text)
+  const hasJyouyou = /(常用)/.test(text)
+  if (!hasOuen && !hasJyouyou) return null
+
+  const supportType: 'jyouyou' | 'ouen' = hasOuen ? 'ouen' : 'jyouyou'
+
+  const companyName = (() => {
+    // 「今日は△△建設の応援」「〇〇工務店の常用」
+    const m1 = text.match(/(?:今日は)?\s*([^\s、，,をにの]+)\s*(?:の)?\s*(?:応援|常用)/)
+    if (m1?.[1]) return m1[1]
+
+    // 「△△建設に応援」
+    const m2 = text.match(/([^\s、，,をにの]+)\s*に\s*(?:応援|常用)/)
+    if (m2?.[1]) return m2[1]
+
+    // 「〇〇工務店 常用」
+    const m3 = text.match(/^([^\s、，,をにの]+)\s+(?:応援|常用)/)
+    if (m3?.[1]) return m3[1]
+
+    return ''
+  })().trim()
+
+  if (!companyName) return null
+  if (companyName.length > 24) return null
+
+  return { companyName, supportType }
+}
+
 type ExpenseCollected = {
   receiptConfirmed: boolean
   whenWhereWhatConfirmed: boolean
@@ -1153,6 +1190,10 @@ export default function SimpleChatScreen() {
   const [isExpenseIntake, setIsExpenseIntake] = useState(false)
   const [dailyReportDraft, setDailyReportDraft] = useState<DailyReportDraft>(defaultDailyReportDraft)
   const [isDailyReportIntake, setIsDailyReportIntake] = useState(false)
+  const [supportDailyReportMeta, setSupportDailyReportMeta] = useState<{
+    companyName: string
+    supportType: 'jyouyou' | 'ouen'
+  } | null>(null)
   const [estimateCollected, setEstimateCollected] = useState<EstimateCollected>(defaultEstimateCollected)
   const [estimatePhase1Values, setEstimatePhase1Values] = useState<EstimatePhase1Values>(defaultEstimatePhase1Values)
   const [estimatePhase, setEstimatePhase] = useState<EstimatePhase>(1)
@@ -1406,6 +1447,147 @@ export default function SimpleChatScreen() {
           timestamp: new Date(),
         }
         setMessages(prev => [...prev, aiMessage])
+        return
+      }
+    }
+
+    // 常用・応援（日報）: support 日報として保存（最小導線）
+    // NOTE: 選択中の現場があっても「常用/応援」ワードがあれば support を優先。
+    const supportMeta = parseSupportDailyReportMeta(trimmed) || supportDailyReportMeta
+    if (supportMeta) {
+      const date = parseExpenseDate(trimmed)
+      const work = parseDailyReportWork(trimmed)
+      const workforceTime = parseDailyReportWorkforceTime(trimmed)
+      const nextPlan = parseDailyReportNextPlan(trimmed)
+      const selfWorkersCount = parseDailyReportSelfWorkersCount(trimmed)
+      const partnerWorkers = parseDailyReportPartnerWorkers(trimmed)
+
+      const isDailyReportLike =
+        isDailyReportIntake ||
+        /(日報)/.test(trimmed) ||
+        /(応援|常用)/.test(trimmed) ||
+        !!work ||
+        !!workforceTime ||
+        !!nextPlan ||
+        /(今日|昨日|\d{1,2}\/\d{1,2}|\d{1,2}月\d{1,2}日)/.test(trimmed)
+
+      // 会社名が取れなければ無理に support にしない
+      if (!supportMeta.companyName) {
+        setSupportDailyReportMeta(null)
+      } else if (isDailyReportLike) {
+        setSupportDailyReportMeta(supportMeta)
+
+        const merged: DailyReportDraft = {
+          date: date ?? dailyReportDraft.date,
+          work: work ?? dailyReportDraft.work,
+          workforceTime: workforceTime ?? dailyReportDraft.workforceTime,
+          nextPlan: nextPlan ?? dailyReportDraft.nextPlan,
+          selfWorkersCount: selfWorkersCount ?? dailyReportDraft.selfWorkersCount,
+          partnerWorkers: partnerWorkers.length ? partnerWorkers : dailyReportDraft.partnerWorkers,
+        }
+
+        const normalized: DailyReportDraft = {
+          date: merged.date ?? toYmd(new Date()),
+          work: merged.work,
+          workforceTime: merged.workforceTime,
+          nextPlan: merged.nextPlan,
+          selfWorkersCount: merged.selfWorkersCount,
+          partnerWorkers: merged.partnerWorkers,
+        }
+
+        if (!normalized.work) {
+          setDailyReportDraft(normalized)
+          setIsDailyReportIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `作業内容を教えてください（例：応援作業 / 配管交換 / 塗装 など）。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        if (!normalized.workforceTime) {
+          setDailyReportDraft(normalized)
+          setIsDailyReportIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `人数/作業時間は？（例：2人 / 8h / 半日 / 終日）`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        if (!normalized.nextPlan) {
+          setDailyReportDraft(normalized)
+          setIsDailyReportIntake(true)
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `明日の予定は？（例：続き / 片付け / 移動 など）`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+          return
+        }
+
+        ;(async () => {
+          const staffText = [trimmed, normalized.work || '', normalized.nextPlan || ''].join(' ')
+          const selfStaff = await extractSelfWorkersFromText(staffText)
+
+          const inferredSelfCount =
+            typeof normalized.selfWorkersCount === 'number'
+              ? normalized.selfWorkersCount
+              : selfStaff.names.length > 0
+                ? selfStaff.names.length
+                : undefined
+
+          const companies = await listPartnerCompanies()
+          const companyIdByName = new Map(companies.map(c => [c.name.trim(), c.id]))
+
+          const partnerWorkers = (normalized.partnerWorkers || []).map(p => ({
+            ...p,
+            partnerCompanyId: companyIdByName.get((p.companyName || '').trim()),
+          }))
+
+          // NOTE: daily-report-store の現行仕様上 projectId が必須。
+          // support 日報は将来、専用の projectId 扱いに移行する想定だが、今回は main-chat 側だけで安全に通すため空文字で保存する。
+          const saved = await createDailyReport({
+            projectId: '',
+            date: normalized.date!,
+            work: normalized.work!,
+            workforceTime: normalized.workforceTime!,
+            nextPlan: normalized.nextPlan!,
+            selfWorkersCount: inferredSelfCount,
+            partnerWorkers,
+            selfWorkerIds: selfStaff.ids,
+            selfWorkerNames: selfStaff.names,
+            reportKind: 'support',
+            supportCompanyName: supportMeta.companyName,
+            supportType: supportMeta.supportType,
+          })
+
+          setDailyReportDraft(defaultDailyReportDraft)
+          setIsDailyReportIntake(false)
+          setSupportDailyReportMeta(null)
+
+          setLastDraftTarget({
+            type: 'daily_report',
+            id: saved.id,
+            projectName: `${supportMeta.companyName}（${supportMeta.supportType === 'ouen' ? '応援' : '常用'}）`,
+          })
+
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: `OKです。${supportMeta.companyName}の${supportMeta.supportType === 'ouen' ? '応援' : '常用'}日報を保存しました。`,
+            sender: 'ai',
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, aiMessage])
+        })()
         return
       }
     }
