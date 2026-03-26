@@ -179,6 +179,64 @@ const parseSupportDailyReportMeta = (
   return { companyName, supportType }
 }
 
+const parseTollExpense = (text: string): { label: string; totalAmount: number } | null => {
+  // NOTE: 最小実装（高速代/ETCのテキスト経費）。曖昧なら既存導線へ流す。
+  // 想定:
+  // - 「高速代 行き1320円 帰り1320円」
+  // - 「高速 行き980円、帰り980円」
+  // - 「ETC 2600円」
+  // - 「高速代2500円」
+  // - 「高速料金 1800円」
+  const hasKeyword = /(高速代|高速料金|高速|ETC)/i.test(text)
+  if (!hasKeyword) return null
+
+  const label = /(ETC)/i.test(text) ? 'ETC' : '高速代'
+
+  const parseMoney = (s: string): number | undefined => {
+    const m = s.match(/(\d{3,7})\s*(?:円|¥|￥)?/)
+    if (!m?.[1]) return undefined
+    const n = Number(m[1])
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    return Math.round(n)
+  }
+
+  const outgoing = (() => {
+    const m = text.match(/(?:行き|往路)\s*(\d{3,7})\s*(?:円|¥|￥)?/)
+    return m?.[1] ? parseMoney(m[1]) : undefined
+  })()
+
+  const returning = (() => {
+    const m = text.match(/(?:帰り|復路)\s*(\d{3,7})\s*(?:円|¥|￥)?/)
+    return m?.[1] ? parseMoney(m[1]) : undefined
+  })()
+
+  const single = (() => {
+    // 「ETC 2600円」「高速代2500円」「高速料金 1800円」
+    const m = text.match(/(?:高速代|高速料金|高速|ETC)\s*(\d{3,7})\s*(?:円|¥|￥)?/i)
+    if (m?.[1]) return parseMoney(m[1])
+
+    // fallback: キーワードがあって円/¥が含まれるなら最初の金額を使う
+    if (/(円|¥|￥)/.test(text)) return parseMoney(text)
+
+    return undefined
+  })()
+
+  const totalAmount =
+    typeof outgoing === 'number' && typeof returning === 'number'
+      ? outgoing + returning
+      : typeof outgoing === 'number'
+        ? outgoing
+        : typeof returning === 'number'
+          ? returning
+          : typeof single === 'number'
+            ? single
+            : undefined
+
+  if (typeof totalAmount !== 'number') return null
+
+  return { label, totalAmount }
+}
+
 type ExpenseCollected = {
   receiptConfirmed: boolean
   whenWhereWhatConfirmed: boolean
@@ -1449,6 +1507,42 @@ export default function SimpleChatScreen() {
         setMessages(prev => [...prev, aiMessage])
         return
       }
+    }
+
+    // 高速代 / ETC（テキスト経費）: 選択中の現場がある時だけ最小で保存
+    const toll = parseTollExpense(trimmed)
+    if (toll) {
+      if (!selectedProject?.id) {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: '経費を登録するには現場を選択してください。',
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+        return
+      }
+
+      const date = parseExpenseDate(trimmed) ?? toYmd(new Date())
+
+      ;(async () => {
+        await createExpense({
+          projectId: selectedProject.id,
+          kind: 'expense',
+          amount: toll.totalAmount,
+          memo: trimmed,
+          date,
+        })
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `OKです。${toll.label} ¥${toll.totalAmount.toLocaleString('ja-JP')} を記録しました。`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
+      })()
+      return
     }
 
     // 常用・応援（日報）: support 日報として保存（最小導線）
