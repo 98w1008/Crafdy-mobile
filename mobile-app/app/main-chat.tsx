@@ -26,6 +26,7 @@ import {
   findPartnerCompanyByName,
   listPartnerCompanies,
 } from '@/lib/partner-company-store'
+import { upsertSupportRate } from '@/lib/support-rate-store'
 
 interface Message {
   id: string
@@ -235,6 +236,66 @@ const parseTollExpense = (text: string): { label: string; totalAmount: number } 
   if (typeof totalAmount !== 'number') return null
 
   return { label, totalAmount }
+}
+
+const parseSupportRateRegistration = (
+  text: string
+): { companyName: string; jyouyouDailyRate?: number; ouenDailyRate?: number } | null => {
+  // NOTE: 最小実装（曖昧なら既存導線へ流す）
+  // 通す例:
+  // - 「△△建設 常用単価22000円で登録」
+  // - 「△△建設 応援単価25000円で登録」
+  // - 「△△建設の常用は22000円」
+  // - 「△△建設の応援は25000円」
+  // - 「△△建設 常用22000円 応援25000円」
+  const hasAnyRateWord = /(単価|常用|応援)/.test(text)
+  if (!hasAnyRateWord) return null
+
+  const parseRate = (s: string): number | undefined => {
+    const m = s.match(/(\d{4,7})\s*(?:円)?/)
+    if (!m?.[1]) return undefined
+    const n = Number(m[1])
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    return Math.round(n)
+  }
+
+  const jyouyou = (() => {
+    const m = text.match(/常用(?:単価)?\s*(\d{4,7})\s*(?:円)?/)
+    if (m?.[1]) return parseRate(m[1])
+    const m2 = text.match(/常用(?:は|＝|=|:)?\s*(\d{4,7})\s*(?:円)?/)
+    if (m2?.[1]) return parseRate(m2[1])
+    return undefined
+  })()
+
+  const ouen = (() => {
+    const m = text.match(/応援(?:単価)?\s*(\d{4,7})\s*(?:円)?/)
+    if (m?.[1]) return parseRate(m[1])
+    const m2 = text.match(/応援(?:は|＝|=|:)?\s*(\d{4,7})\s*(?:円)?/)
+    if (m2?.[1]) return parseRate(m2[1])
+    return undefined
+  })()
+
+  const shouldHandle =
+    (typeof jyouyou === 'number' || typeof ouen === 'number') &&
+    /(常用|応援)/.test(text)
+  if (!shouldHandle) return null
+
+  const companyName = (() => {
+    // 「△△建設 常用...」「△△建設の常用は...」「△△建設 常用... 応援...」
+    const m1 = text.match(/^([^\s、，,をにの]+)\s*(?:の)?\s*(?:常用|応援)/)
+    if (m1?.[1]) return m1[1]
+
+    // 「△△建設 応援単価...」「△△建設 常用単価...」
+    const m2 = text.match(/^([^\s、，,をにの]+)\s*(?:常用単価|応援単価)/)
+    if (m2?.[1]) return m2[1]
+
+    return ''
+  })().trim()
+
+  if (!companyName) return null
+  if (companyName.length > 24) return null
+
+  return { companyName, jyouyouDailyRate: jyouyou, ouenDailyRate: ouen }
 }
 
 type ExpenseCollected = {
@@ -1418,6 +1479,35 @@ export default function SimpleChatScreen() {
           setMessages(prev => [...prev, aiMessage])
         }
         setLastDraftTarget(null)
+      })()
+      return
+    }
+
+    // 常用・応援の単価登録（最小導線）
+    const supportRateReg = parseSupportRateRegistration(trimmed)
+    if (supportRateReg) {
+      ;(async () => {
+        const saved = await upsertSupportRate({
+          companyName: supportRateReg.companyName,
+          jyouyouDailyRate: supportRateReg.jyouyouDailyRate,
+          ouenDailyRate: supportRateReg.ouenDailyRate,
+        })
+
+        const parts: string[] = []
+        if (typeof supportRateReg.jyouyouDailyRate === 'number') {
+          parts.push(`常用単価を${supportRateReg.jyouyouDailyRate.toLocaleString('ja-JP')}円`)
+        }
+        if (typeof supportRateReg.ouenDailyRate === 'number') {
+          parts.push(`応援単価を${supportRateReg.ouenDailyRate.toLocaleString('ja-JP')}円`)
+        }
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `OKです。${saved.companyName}の${parts.join(' / ')}で登録しました。`,
+          sender: 'ai',
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, aiMessage])
       })()
       return
     }
