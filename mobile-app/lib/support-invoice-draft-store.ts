@@ -32,9 +32,50 @@ const saveSupportInvoiceDrafts = async (items: SupportInvoiceDraft[]) => {
   await AsyncStorage.setItem(SUPPORT_INVOICE_DRAFTS_KEY, JSON.stringify(items))
 }
 
+const ensureLine = (v: any): SupportInvoiceDraftLine | null => {
+  const label = String(v?.label || '').trim()
+  if (!label) return null
+
+  const quantity = Number(v?.quantity)
+  const unitPrice = Number(v?.unitPrice)
+  const amount = Number(v?.amount)
+
+  if (!Number.isFinite(quantity) || quantity <= 0) return null
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) return null
+  if (!Number.isFinite(amount) || amount < 0) return null
+
+  return {
+    label,
+    quantity: Math.floor(quantity),
+    unitPrice: Math.floor(unitPrice),
+    amount: Math.floor(amount),
+  }
+}
+
 export const listSupportInvoiceDrafts = async (): Promise<SupportInvoiceDraft[]> => {
   const raw = await AsyncStorage.getItem(SUPPORT_INVOICE_DRAFTS_KEY)
-  return safeParse<SupportInvoiceDraft[]>(raw, [])
+  const items = safeParse<any[]>(raw, [])
+  return items
+    .map((d: any) => {
+      const companyName = String(d?.companyName || '').trim()
+      const ym = String(d?.ym || '').trim()
+      const title = String(d?.title || '').trim()
+      if (!companyName || !ym || !title) return null
+
+      const lines = Array.isArray(d?.lines) ? d.lines.map(ensureLine).filter(Boolean) : []
+      const subtotal = Number(d?.subtotal)
+
+      return {
+        ...d,
+        companyName,
+        ym,
+        title,
+        lines: lines as SupportInvoiceDraftLine[],
+        subtotal: Number.isFinite(subtotal) && subtotal >= 0 ? Math.floor(subtotal) : 0,
+        createdAt: String(d?.createdAt || '').trim() || new Date().toISOString(),
+      } as SupportInvoiceDraft
+    })
+    .filter(Boolean) as SupportInvoiceDraft[]
 }
 
 export const createOrReplaceSupportInvoiceDraft = async (params: {

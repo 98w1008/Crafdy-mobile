@@ -82,6 +82,7 @@ export default function DashboardTab() {
   const canSeePartnerWorkforce = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeSupportSummary = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeSupportBillingCandidates = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+  const canSeeSupportInvoiceDrafts = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
@@ -468,6 +469,26 @@ export default function DashboardTab() {
             title="招待コード管理へ"
             variant="secondary"
             onPress={() => router.push('/company/settings' as any)}
+          />
+        </View>
+      </Card>
+    )
+  }
+
+  const renderSupportInvoiceDraftsLink = () => {
+    if (!canSeeSupportInvoiceDrafts) return null
+
+    return (
+      <Card variant="elevated" style={styles.supportInvoiceDraftsCard}>
+        <StyledText variant="subtitle" weight="semibold">請求書下書き（常用・応援）</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          作成済みの請求書下書きを見返します
+        </StyledText>
+        <View style={{ marginTop: Spacing.sm }}>
+          <StyledButton
+            title="請求書下書き一覧へ"
+            variant="secondary"
+            onPress={() => router.push('/support-invoice-drafts' as any)}
           />
         </View>
       </Card>
@@ -1104,6 +1125,7 @@ export default function DashboardTab() {
         >
           {renderWelcomeCard()}
           {renderCompanySettingsLink()}
+          {renderSupportInvoiceDraftsLink()}
           {renderPendingReviewsCard()}
           {renderWorkerAttendanceCard()}
           {renderPartnerWorkforceCard()}
@@ -1137,6 +1159,7 @@ export default function DashboardTab() {
         {renderWelcomeCard()}
 
         {renderCompanySettingsLink()}
+        {renderSupportInvoiceDraftsLink()}
 
         {renderPendingReviewsCard()}
 
@@ -1187,6 +1210,10 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   companySettingsCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  supportInvoiceDraftsCard: {
     marginBottom: Spacing.lg,
     padding: Spacing.md,
   },
