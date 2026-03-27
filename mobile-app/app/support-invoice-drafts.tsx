@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { SafeAreaView, ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native'
+import { useFocusEffect, router } from 'expo-router'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
@@ -66,48 +66,63 @@ export default function SupportInvoiceDraftsScreen() {
         ) : (
           <View style={{ gap: Spacing.md }}>
             {visibleDrafts.map(d => (
-              <Card key={`${d.companyName}-${d.ym}-${d.id}`} variant="elevated" style={styles.draftCard}>
-                <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
-                  {d.companyName}
-                </StyledText>
-                <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
-                  対象月: {d.ym}
-                </StyledText>
-                <StyledText variant="caption" color="secondary" numberOfLines={2} style={{ marginTop: 2 }}>
-                  {d.title}
-                </StyledText>
-
-                <View style={styles.subtotalRow}>
-                  <StyledText variant="caption" weight="semibold">小計</StyledText>
-                  <StyledText variant="caption" weight="semibold">¥{(d.subtotal ?? 0).toLocaleString('ja-JP')}</StyledText>
-                </View>
-
-                {d.lines?.length ? (
-                  <View style={{ marginTop: Spacing.sm, gap: 6 }}>
-                    {d.lines.slice(0, 5).map((l, idx) => (
-                      <View key={`${d.id}-line-${idx}`} style={styles.lineRow}>
-                        <StyledText variant="caption" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
-                          {l.label}
-                        </StyledText>
-                        <StyledText variant="caption" color="secondary">
-                          {l.quantity} × ¥{l.unitPrice.toLocaleString('ja-JP')}
-                        </StyledText>
-                        <StyledText variant="caption" color="secondary">
-                          ¥{l.amount.toLocaleString('ja-JP')}
-                        </StyledText>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <StyledText variant="body" color="secondary" style={{ marginTop: Spacing.sm }}>
-                    明細がありません。
+              <TouchableOpacity
+                key={`${d.companyName}-${d.ym}-${d.id}`}
+                activeOpacity={0.9}
+                onPress={() => router.push(`/support-invoice-drafts/${d.id}` as any)}
+              >
+                <Card variant="elevated" style={styles.draftCard}>
+                  <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
+                    {d.companyName}
                   </StyledText>
-                )}
+                  <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+                    対象月: {d.ym}
+                  </StyledText>
+                  <StyledText variant="caption" color="secondary" numberOfLines={2} style={{ marginTop: 2 }}>
+                    {d.title}
+                  </StyledText>
 
-                <View style={{ marginTop: Spacing.sm }}>
-                  <StyledButton title="更新" variant="secondary" onPress={reload} />
-                </View>
-              </Card>
+                  <View style={styles.subtotalRow}>
+                    <StyledText variant="caption" weight="semibold">小計</StyledText>
+                    <StyledText variant="caption" weight="semibold">¥{(d.subtotal ?? 0).toLocaleString('ja-JP')}</StyledText>
+                  </View>
+
+                  {d.lines?.length ? (
+                    <View style={{ marginTop: Spacing.sm, gap: 6 }}>
+                      {d.lines.slice(0, 5).map((l, idx) => (
+                        <View key={`${d.id}-line-${idx}`} style={styles.lineRow}>
+                          <StyledText variant="caption" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
+                            {l.label}
+                          </StyledText>
+                          <StyledText variant="caption" color="secondary">
+                            {l.quantity} × ¥{l.unitPrice.toLocaleString('ja-JP')}
+                          </StyledText>
+                          <StyledText variant="caption" color="secondary">
+                            ¥{l.amount.toLocaleString('ja-JP')}
+                          </StyledText>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <StyledText variant="body" color="secondary" style={{ marginTop: Spacing.sm }}>
+                      明細がありません。
+                    </StyledText>
+                  )}
+
+                  <View style={{ marginTop: Spacing.sm, flexDirection: 'row', gap: Spacing.sm }}>
+                    <View style={{ flex: 1 }}>
+                      <StyledButton
+                        title="開く"
+                        variant="primary"
+                        onPress={() => router.push(`/support-invoice-drafts/${d.id}` as any)}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <StyledButton title="更新" variant="secondary" onPress={reload} />
+                    </View>
+                  </View>
+                </Card>
+              </TouchableOpacity>
             ))}
           </View>
         )}
