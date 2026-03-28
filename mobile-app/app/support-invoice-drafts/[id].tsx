@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router'
+
+type SupportInvoiceTemplateKey = 'standard_simple' | 'standard_detail' | 'standard_site'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
@@ -11,6 +13,7 @@ export default function SupportInvoiceDraftPreviewScreen() {
 
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [drafts, setDrafts] = useState<SupportInvoiceDraft[]>([])
+  const [templateKey, setTemplateKey] = useState<SupportInvoiceTemplateKey>('standard_simple')
 
   const canSee = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
@@ -104,6 +107,120 @@ export default function SupportInvoiceDraftPreviewScreen() {
     }
   }
 
+  const templateLabel = (k: SupportInvoiceTemplateKey) => {
+    if (k === 'standard_detail') return '明細'
+    if (k === 'standard_site') return '現場向け'
+    return 'シンプル'
+  }
+
+  const renderTemplateSwitch = () => (
+    <View style={styles.templateSwitchRow}>
+      {(
+        [
+          { key: 'standard_simple' as const, label: 'シンプル' },
+          { key: 'standard_detail' as const, label: '明細' },
+          { key: 'standard_site' as const, label: '現場向け' },
+        ]
+      ).map(t => {
+        const active = templateKey === t.key
+        return (
+          <View key={t.key} style={{ flex: 1 }}>
+            <StyledButton
+              title={t.label}
+              variant={active ? 'primary' : 'secondary'}
+              onPress={() => setTemplateKey(t.key)}
+            />
+          </View>
+        )
+      })}
+    </View>
+  )
+
+  const renderInvoicePaper = () => {
+    const isDetail = templateKey === 'standard_detail'
+    const isSite = templateKey === 'standard_site'
+
+    return (
+      <View style={[styles.paper, isDetail ? styles.paperDetail : null, isSite ? styles.paperSite : null]}>
+        <View style={styles.paperHeader}>
+          <View style={{ gap: 2 }}>
+            <StyledText variant="heading2" weight="bold">請求書</StyledText>
+            <StyledText variant="caption" color="secondary">テンプレ: {templateLabel(templateKey)}</StyledText>
+          </View>
+          <StyledText variant="caption" color="secondary">対象月: {draft.ym}</StyledText>
+        </View>
+
+        <View style={[styles.toBlock, isSite ? styles.toBlockSite : null]}>
+          <StyledText variant="caption" color="secondary">請求先</StyledText>
+          <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
+            {draft.companyName}
+          </StyledText>
+          <StyledText variant="caption" color="secondary" numberOfLines={2}>
+            {draft.title}
+          </StyledText>
+        </View>
+
+        <View style={[styles.table, isDetail ? styles.tableDetail : null]}>
+          <View style={[styles.tableRow, styles.tableHeaderRow, isDetail ? styles.tableHeaderRowDetail : null]}>
+            <StyledText variant="caption" weight="semibold" style={{ flex: 2 }}>
+              項目
+            </StyledText>
+            <StyledText variant="caption" weight="semibold" style={{ flex: 1, textAlign: 'right' }}>
+              数量
+            </StyledText>
+            <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>
+              単価
+            </StyledText>
+            <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>
+              金額
+            </StyledText>
+          </View>
+
+          {(draft.lines || []).map((l, idx) => (
+            <View key={`line-${idx}`} style={[styles.tableRow, isDetail ? styles.tableRowDetail : null]}>
+              <StyledText variant="caption" style={{ flex: 2 }} numberOfLines={1}>
+                {l.label}
+              </StyledText>
+              <StyledText variant="caption" color="secondary" style={{ flex: 1, textAlign: 'right' }}>
+                {l.quantity}
+              </StyledText>
+              <StyledText variant="caption" color="secondary" style={{ flex: 2, textAlign: 'right' }}>
+                ¥{l.unitPrice.toLocaleString('ja-JP')}
+              </StyledText>
+              <StyledText variant="caption" color="secondary" style={{ flex: 2, textAlign: 'right' }}>
+                ¥{l.amount.toLocaleString('ja-JP')}
+              </StyledText>
+            </View>
+          ))}
+
+          <View style={[styles.tableRow, styles.tableFooterRow, isDetail ? styles.tableFooterRowDetail : null]}>
+            <View style={{ flex: 2 }} />
+            <View style={{ flex: 1 }} />
+            <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>
+              小計
+            </StyledText>
+            <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>
+              ¥{(draft.subtotal ?? 0).toLocaleString('ja-JP')}
+            </StyledText>
+          </View>
+        </View>
+
+        {isDetail ? (
+          <View style={styles.noteBlock}>
+            <StyledText variant="caption" weight="semibold">備考</StyledText>
+            <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+              ありがとうございます。ご不明点があればご連絡ください。
+            </StyledText>
+          </View>
+        ) : null}
+
+        <StyledText variant="caption" color="secondary" style={{ marginTop: Spacing.md }}>
+          ※ これはプレビューです（PDF出力・税計算・請求番号は未対応）。
+        </StyledText>
+      </View>
+    )
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -117,64 +234,10 @@ export default function SupportInvoiceDraftPreviewScreen() {
           <StyledButton title="共有" variant="secondary" onPress={handleShare} />
         </View>
 
+        {renderTemplateSwitch()}
+
         {/* クラフディ標準テンプレ（最小プレビュー） */}
-        <View style={styles.paper}>
-          <View style={styles.paperHeader}>
-            <StyledText variant="heading2" weight="bold">請求書</StyledText>
-            <StyledText variant="caption" color="secondary">対象月: {draft.ym}</StyledText>
-          </View>
-
-          <View style={styles.toBlock}>
-            <StyledText variant="caption" color="secondary">請求先</StyledText>
-            <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
-              {draft.companyName}
-            </StyledText>
-            <StyledText variant="caption" color="secondary" numberOfLines={2}>
-              {draft.title}
-            </StyledText>
-          </View>
-
-          <View style={styles.table}>
-            <View style={[styles.tableRow, styles.tableHeaderRow]}>
-              <StyledText variant="caption" weight="semibold" style={{ flex: 2 }}>項目</StyledText>
-              <StyledText variant="caption" weight="semibold" style={{ flex: 1, textAlign: 'right' }}>数量</StyledText>
-              <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>単価</StyledText>
-              <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>金額</StyledText>
-            </View>
-
-            {(draft.lines || []).map((l, idx) => (
-              <View key={`line-${idx}`} style={styles.tableRow}>
-                <StyledText variant="caption" style={{ flex: 2 }} numberOfLines={1}>
-                  {l.label}
-                </StyledText>
-                <StyledText variant="caption" color="secondary" style={{ flex: 1, textAlign: 'right' }}>
-                  {l.quantity}
-                </StyledText>
-                <StyledText variant="caption" color="secondary" style={{ flex: 2, textAlign: 'right' }}>
-                  ¥{l.unitPrice.toLocaleString('ja-JP')}
-                </StyledText>
-                <StyledText variant="caption" color="secondary" style={{ flex: 2, textAlign: 'right' }}>
-                  ¥{l.amount.toLocaleString('ja-JP')}
-                </StyledText>
-              </View>
-            ))}
-
-            <View style={[styles.tableRow, styles.tableFooterRow]}>
-              <View style={{ flex: 2 }} />
-              <View style={{ flex: 1 }} />
-              <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>
-                小計
-              </StyledText>
-              <StyledText variant="caption" weight="semibold" style={{ flex: 2, textAlign: 'right' }}>
-                ¥{(draft.subtotal ?? 0).toLocaleString('ja-JP')}
-              </StyledText>
-            </View>
-          </View>
-
-          <StyledText variant="caption" color="secondary" style={{ marginTop: Spacing.md }}>
-            ※ これはプレビューです（PDF出力・税計算・請求番号は未対応）。
-          </StyledText>
-        </View>
+        {renderInvoicePaper()}
       </ScrollView>
     </SafeAreaView>
   )
@@ -190,6 +253,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
+  templateSwitchRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
 
   infoCard: { padding: Spacing.md },
 
@@ -199,6 +267,13 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.borderLight,
+  },
+  paperDetail: {
+    borderColor: Colors.border,
+    borderWidth: 2,
+  },
+  paperSite: {
+    backgroundColor: Colors.surfaceGray,
   },
   paperHeader: {
     flexDirection: 'row',
@@ -212,12 +287,22 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
   },
+  toBlockSite: {
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+    paddingLeft: Spacing.md,
+  },
 
   table: {
     borderWidth: 1,
     borderColor: Colors.borderLight,
     borderRadius: BorderRadius.md,
     overflow: 'hidden',
+  },
+  tableDetail: {
+    borderColor: Colors.border,
   },
   tableRow: {
     flexDirection: 'row',
@@ -228,11 +313,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
+  tableRowDetail: {
+    paddingVertical: 12,
+  },
   tableHeaderRow: {
     backgroundColor: Colors.surfaceGray,
+  },
+  tableHeaderRowDetail: {
+    backgroundColor: Colors.surface,
   },
   tableFooterRow: {
     borderBottomWidth: 0,
     backgroundColor: Colors.surfaceGray,
+  },
+  tableFooterRowDetail: {
+    backgroundColor: Colors.surface,
+  },
+  noteBlock: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
   },
 })
