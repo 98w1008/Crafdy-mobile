@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors'
@@ -73,6 +73,37 @@ export default function SupportInvoiceDraftPreviewScreen() {
     )
   }
 
+  const buildShareText = (d: SupportInvoiceDraft): string => {
+    const linesText = (d.lines || [])
+      .map(l => {
+        const unit = `¥${l.unitPrice.toLocaleString('ja-JP')}`
+        const amt = `¥${l.amount.toLocaleString('ja-JP')}`
+        return `- ${l.label}: ${l.quantity} × ${unit} = ${amt}`
+      })
+      .join('\n')
+
+    return [
+      '請求書（下書き）',
+      `請求先: ${d.companyName}`,
+      `対象月: ${d.ym}`,
+      '',
+      '明細:',
+      linesText || '（明細なし）',
+      '',
+      `小計: ¥${(d.subtotal ?? 0).toLocaleString('ja-JP')}`,
+    ].join('\n')
+  }
+
+  const handleShare = async () => {
+    try {
+      const message = buildShareText(draft)
+      await Share.share({ message })
+    } catch (e) {
+      console.error('Failed to share support invoice draft', e)
+      Alert.alert('出力に失敗しました', '共有できませんでした。もう一度お試しください。')
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -83,6 +114,7 @@ export default function SupportInvoiceDraftPreviewScreen() {
         <View style={styles.actionsRow}>
           <StyledButton title="一覧へ" variant="secondary" onPress={() => router.push('/support-invoice-drafts' as any)} />
           <StyledButton title="更新" variant="secondary" onPress={reload} />
+          <StyledButton title="共有" variant="secondary" onPress={handleShare} />
         </View>
 
         {/* クラフディ標準テンプレ（最小プレビュー） */}
