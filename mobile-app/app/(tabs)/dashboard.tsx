@@ -83,6 +83,7 @@ export default function DashboardTab() {
   const canSeeSupportSummary = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeSupportBillingCandidates = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeSupportInvoiceDrafts = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+  const canSeeInvoiceTemplates = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
@@ -489,6 +490,26 @@ export default function DashboardTab() {
             title="請求書下書き一覧へ"
             variant="secondary"
             onPress={() => router.push('/support-invoice-drafts' as any)}
+          />
+        </View>
+      </Card>
+    )
+  }
+
+  const renderInvoiceTemplatesLink = () => {
+    if (!canSeeInvoiceTemplates) return null
+
+    return (
+      <Card variant="elevated" style={styles.supportInvoiceDraftsCard}>
+        <StyledText variant="subtitle" weight="semibold">請求書テンプレ</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          標準テンプレの選択（自社テンプレは今後対応）
+        </StyledText>
+        <View style={{ marginTop: Spacing.sm }}>
+          <StyledButton
+            title="テンプレ管理へ"
+            variant="secondary"
+            onPress={() => router.push('/invoice-templates' as any)}
           />
         </View>
       </Card>
@@ -1126,6 +1147,7 @@ export default function DashboardTab() {
           {renderWelcomeCard()}
           {renderCompanySettingsLink()}
           {renderSupportInvoiceDraftsLink()}
+          {renderInvoiceTemplatesLink()}
           {renderPendingReviewsCard()}
           {renderWorkerAttendanceCard()}
           {renderPartnerWorkforceCard()}
@@ -1160,6 +1182,7 @@ export default function DashboardTab() {
 
         {renderCompanySettingsLink()}
         {renderSupportInvoiceDraftsLink()}
+        {renderInvoiceTemplatesLink()}
 
         {renderPendingReviewsCard()}
 
