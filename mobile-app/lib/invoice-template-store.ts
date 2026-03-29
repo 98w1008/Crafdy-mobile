@@ -101,3 +101,38 @@ export const setActiveInvoiceTemplate = async (id: string): Promise<void> => {
   const next = items.map(x => ({ ...x, isActive: x.id === id }))
   await saveInvoiceTemplates(next)
 }
+
+export const createUploadedInvoiceTemplate = async (params: {
+  name: string
+  sourceUri: string
+}): Promise<InvoiceTemplate> => {
+  // NOTE: 最小実装（ローカル保存のみ）。後続PRで server/DB + file upload に置換する。
+  const sourceUri = String(params.sourceUri || '').trim()
+  if (!sourceUri) throw new Error('sourceUri is required')
+
+  const fallbackName = (() => {
+    const last = sourceUri.split('/').filter(Boolean).pop()
+    return last ? decodeURIComponent(last) : 'アップロードテンプレ'
+  })()
+
+  const name = String(params.name || '').trim() || fallbackName
+
+  const items = await listInvoiceTemplates()
+
+  // 同じ sourceUri の重複登録は避ける（最小）
+  const hit = items.find(t => t.kind === 'uploaded' && String(t.sourceUri || '').trim() === sourceUri)
+  if (hit) return hit
+
+  const now = new Date()
+  const created: InvoiceTemplate = {
+    id: `invoice-template-uploaded-${now.getTime()}`,
+    name,
+    kind: 'uploaded',
+    sourceUri,
+    isActive: false,
+    createdAt: now.toISOString(),
+  }
+
+  await saveInvoiceTemplates([created, ...items])
+  return created
+}

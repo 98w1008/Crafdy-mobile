@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react'
-import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
 import { useFocusEffect } from 'expo-router'
+import * as DocumentPicker from 'expo-document-picker'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
-import { listInvoiceTemplates, setActiveInvoiceTemplate, type InvoiceTemplate } from '@/lib/invoice-template-store'
+import {
+  createUploadedInvoiceTemplate,
+  listInvoiceTemplates,
+  setActiveInvoiceTemplate,
+  type InvoiceTemplate,
+} from '@/lib/invoice-template-store'
 
 export default function InvoiceTemplatesScreen() {
   const [access, setAccess] = useState<AccessContext | null>(null)
@@ -34,6 +40,43 @@ export default function InvoiceTemplatesScreen() {
     await reload()
   }
 
+  const handlePickAndRegister = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'image/*',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ],
+        multiple: false,
+        copyToCacheDirectory: true,
+      })
+
+      if (result.canceled) return
+
+      const asset = result.assets?.[0]
+      const sourceUri = String(asset?.uri || '').trim()
+      if (!sourceUri) {
+        Alert.alert('テンプレ登録に失敗しました', 'ファイルの取得に失敗しました。')
+        return
+      }
+
+      await createUploadedInvoiceTemplate({
+        name: String(asset?.name || '').trim(),
+        sourceUri,
+      })
+
+      await reload()
+      Alert.alert('テンプレを登録しました')
+    } catch (e) {
+      console.error('Failed to register uploaded invoice template', e)
+      Alert.alert('テンプレ登録に失敗しました', 'もう一度お試しください。')
+    }
+  }
+
   const visibleTemplates = canSee ? templates : []
 
   return (
@@ -42,7 +85,8 @@ export default function InvoiceTemplatesScreen() {
         <View style={styles.header}>
           <StyledText variant="heading2" weight="bold">請求書テンプレ</StyledText>
           <StyledText variant="body" color="secondary">
-            今はクラフディ標準テンプレを選べます。自社テンプレアップロードは今後対応予定です。
+            今はクラフディ標準テンプレを選べます。自社テンプレ（ファイル選択）の登録もできます。
+            ※ アップロードテンプレの請求書プレビュー/出力への適用は今後対応予定です。
           </StyledText>
         </View>
 
@@ -55,6 +99,16 @@ export default function InvoiceTemplatesScreen() {
           </Card>
         ) : (
           <View style={{ gap: Spacing.md }}>
+            <Card variant="elevated" style={styles.templateCard}>
+              <StyledText variant="subtitle" weight="semibold">テンプレを追加</StyledText>
+              <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+                まずはファイルを選んでテンプレとして登録できます（解析・差し込みは未対応）。
+              </StyledText>
+              <View style={{ marginTop: Spacing.sm }}>
+                <StyledButton title="ファイルを選択" variant="primary" onPress={handlePickAndRegister} />
+              </View>
+            </Card>
+
             {visibleTemplates.map(t => (
               <Card key={t.id} variant="elevated" style={styles.templateCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.sm }}>
