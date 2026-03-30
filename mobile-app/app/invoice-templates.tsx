@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
@@ -10,6 +10,8 @@ import {
   listInvoiceTemplates,
   setActiveInvoiceTemplate,
   type InvoiceTemplate,
+  type InvoiceTemplateApplyStatus,
+  type InvoiceTemplateFileType,
 } from '@/lib/invoice-template-store'
 
 export default function InvoiceTemplatesScreen() {
@@ -79,6 +81,22 @@ export default function InvoiceTemplatesScreen() {
 
   const visibleTemplates = canSee ? templates : []
 
+  const activeTemplate = useMemo(() => visibleTemplates.find(t => t.isActive) ?? null, [visibleTemplates])
+
+  const fileTypeLabel = (ft: InvoiceTemplateFileType | undefined) => {
+    if (ft === 'pdf') return 'PDF'
+    if (ft === 'image') return '画像'
+    if (ft === 'word') return 'Word'
+    if (ft === 'excel') return 'Excel'
+    return '不明'
+  }
+
+  const applyStatusLabel = (s: InvoiceTemplateApplyStatus | undefined) => {
+    if (s === 'ready_for_future_apply') return '今後適用候補'
+    if (s === 'unsupported_yet') return 'まだ未対応'
+    return ''
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -99,6 +117,14 @@ export default function InvoiceTemplatesScreen() {
           </Card>
         ) : (
           <View style={{ gap: Spacing.md }}>
+            {activeTemplate?.kind === 'uploaded' ? (
+              <Card variant="elevated" style={styles.activeUploadedInfoCard}>
+                <StyledText variant="caption" color="secondary">
+                  アップロードテンプレを使用中です。差し込み適用は今後対応予定です。
+                </StyledText>
+              </Card>
+            ) : null}
+
             <Card variant="elevated" style={styles.templateCard}>
               <StyledText variant="subtitle" weight="semibold">テンプレを追加</StyledText>
               <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
@@ -119,6 +145,13 @@ export default function InvoiceTemplatesScreen() {
                     <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
                       kind: {t.kind}{t.templateKey ? ` / ${t.templateKey}` : ''}
                     </StyledText>
+
+                    {t.kind === 'uploaded' ? (
+                      <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                        種別: {fileTypeLabel(t.fileType)} / 状態: {applyStatusLabel(t.applyStatus)}
+                      </StyledText>
+                    ) : null}
+
                     <StyledText variant="caption" color={t.isActive ? 'primary' : 'secondary'} style={{ marginTop: 2 }}>
                       {t.isActive ? '使用中' : '未選択'}
                     </StyledText>
@@ -147,5 +180,6 @@ const styles = StyleSheet.create({
   scrollContent: { padding: Spacing.md, paddingBottom: Spacing['2xl'] },
   header: { marginBottom: Spacing.lg, paddingTop: Spacing.sm },
   infoCard: { padding: Spacing.md },
+  activeUploadedInfoCard: { padding: Spacing.sm },
   templateCard: { padding: Spacing.md },
 })

@@ -1,12 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export type InvoiceTemplateKind = 'standard' | 'uploaded'
+export type InvoiceTemplateFileType = 'pdf' | 'image' | 'word' | 'excel' | 'unknown'
+export type InvoiceTemplateApplyStatus = 'ready_for_future_apply' | 'unsupported_yet'
+
 export type InvoiceTemplate = {
   id: string
   name: string
   kind: InvoiceTemplateKind
   templateKey?: 'standard_simple' | 'standard_detail' | 'standard_site'
   sourceUri?: string
+  fileType?: InvoiceTemplateFileType
+  applyStatus?: InvoiceTemplateApplyStatus
   isActive: boolean
   createdAt: string
 }
@@ -26,10 +31,44 @@ const saveInvoiceTemplates = async (items: InvoiceTemplate[]) => {
   await AsyncStorage.setItem(INVOICE_TEMPLATES_KEY, JSON.stringify(items))
 }
 
+const normalizeTemplate = (t: InvoiceTemplate): InvoiceTemplate => {
+  const fileType: InvoiceTemplateFileType =
+    t.kind === 'uploaded'
+      ? (t.fileType ?? 'unknown')
+      : (t.fileType as InvoiceTemplateFileType | undefined)
+
+  const applyStatus: InvoiceTemplateApplyStatus | undefined = (() => {
+    if (t.kind !== 'uploaded') return t.applyStatus
+    if (t.applyStatus) return t.applyStatus
+    // uploaded の後方互換：未設定は安全に unknown/unsupported をデフォルト
+    if (fileType === 'unknown') return 'unsupported_yet'
+    return 'ready_for_future_apply'
+  })()
+
+  return {
+    ...t,
+    fileType: t.kind === 'uploaded' ? fileType : t.fileType,
+    applyStatus,
+  }
+}
+
+const guessFileType = (params: { name?: string; sourceUri?: string }): InvoiceTemplateFileType => {
+  const raw = `${params.name ?? ''} ${params.sourceUri ?? ''}`.toLowerCase()
+  const ext = raw.split('?')[0].split('#')[0].split('.').pop() || ''
+
+  if (ext === 'pdf') return 'pdf'
+  if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'image'
+  if (['doc', 'docx'].includes(ext)) return 'word'
+  if (['xls', 'xlsx'].includes(ext)) return 'excel'
+
+  // uri に拡張子が無いケースは最小で unknown
+  return 'unknown'
+}
+
 export const seedStandardInvoiceTemplates = async (): Promise<void> => {
   // NOTE: 最小実装（ローカル保存のみ）。後続PRで server/DB に置換する。
   const raw = await AsyncStorage.getItem(INVOICE_TEMPLATES_KEY)
-  const items = safeParse<InvoiceTemplate[]>(raw, [])
+  const items = safeParse<InvoiceTemplate[]>(raw, []).map(normalizeTemplate)
 
   const now = new Date().toISOString()
 
@@ -86,7 +125,11 @@ export const seedStandardInvoiceTemplates = async (): Promise<void> => {
 export const listInvoiceTemplates = async (): Promise<InvoiceTemplate[]> => {
   await seedStandardInvoiceTemplates()
   const raw = await AsyncStorage.getItem(INVOICE_TEMPLATES_KEY)
-  const items = safeParse<InvoiceTemplate[]>(raw, [])
+  const items = safeParse<InvoiceTemplate[]>(raw, []).map(normalizeTemplate)
+
+  // 後方互換の補完を永続化（軽量）
+  await saveInvoiceTemplates(items)
+
   return items.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
 }
 
@@ -123,12 +166,17 @@ export const createUploadedInvoiceTemplate = async (params: {
   const hit = items.find(t => t.kind === 'uploaded' && String(t.sourceUri || '').trim() === sourceUri)
   if (hit) return hit
 
+  const fileType = guessFileType({ name, sourceUri })
+  const applyStatus: InvoiceTemplateApplyStatus = fileType === 'unknown' ? 'unsupported_yet' : 'ready_for_future_apply'
+
   const now = new Date()
   const created: InvoiceTemplate = {
     id: `invoice-template-uploaded-${now.getTime()}`,
     name,
     kind: 'uploaded',
     sourceUri,
+    fileType,
+    applyStatus,
     isActive: false,
     createdAt: now.toISOString(),
   }
