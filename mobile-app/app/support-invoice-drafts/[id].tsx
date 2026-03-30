@@ -7,6 +7,7 @@ import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import { listSupportInvoiceDrafts, type SupportInvoiceDraft } from '@/lib/support-invoice-draft-store'
+import { getActiveInvoiceTemplate } from '@/lib/invoice-template-store'
 
 export default function SupportInvoiceDraftPreviewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>()
@@ -14,6 +15,8 @@ export default function SupportInvoiceDraftPreviewScreen() {
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [drafts, setDrafts] = useState<SupportInvoiceDraft[]>([])
   const [templateKey, setTemplateKey] = useState<SupportInvoiceTemplateKey>('standard_simple')
+  const [didInitTemplate, setDidInitTemplate] = useState(false)
+  const [uploadedActiveNote, setUploadedActiveNote] = useState(false)
 
   const canSee = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
@@ -23,8 +26,41 @@ export default function SupportInvoiceDraftPreviewScreen() {
     setDrafts(items)
   }
 
+  const initTemplateFromActive = async () => {
+    try {
+      const active = await getActiveInvoiceTemplate()
+      if (!active) {
+        setUploadedActiveNote(false)
+        return
+      }
+
+      if (active.kind === 'standard' && active.templateKey) {
+        setTemplateKey(active.templateKey)
+        setUploadedActiveNote(false)
+        return
+      }
+
+      if (active.kind === 'uploaded') {
+        // NOTE: uploaded template のプレビュー差し込みは今後対応。今回は安全に標準へfallback。
+        setTemplateKey('standard_simple')
+        setUploadedActiveNote(true)
+        return
+      }
+
+      setUploadedActiveNote(false)
+    } catch (e) {
+      console.error('Failed to load active invoice template', e)
+      setUploadedActiveNote(false)
+    }
+  }
+
   useEffect(() => {
     reload()
+
+    if (!didInitTemplate) {
+      setDidInitTemplate(true)
+      initTemplateFromActive()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -236,6 +272,14 @@ export default function SupportInvoiceDraftPreviewScreen() {
 
         {renderTemplateSwitch()}
 
+        {uploadedActiveNote ? (
+          <Card variant="elevated" style={styles.uploadedNoteCard}>
+            <StyledText variant="caption" color="secondary">
+              アップロードテンプレは登録済みですが、プレビュー適用は今後対応です（いまは標準テンプレで表示します）。
+            </StyledText>
+          </Card>
+        ) : null}
+
         {/* クラフディ標準テンプレ（最小プレビュー） */}
         {renderInvoicePaper()}
       </ScrollView>
@@ -256,6 +300,10 @@ const styles = StyleSheet.create({
   templateSwitchRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  uploadedNoteCard: {
+    padding: Spacing.sm,
     marginBottom: Spacing.md,
   },
 
