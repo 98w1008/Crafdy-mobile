@@ -1,0 +1,187 @@
+import React, { useEffect, useState } from 'react'
+import { Alert, SafeAreaView, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { useFocusEffect } from 'expo-router'
+import { Card, StyledButton, StyledText } from '@/components/ui'
+import { Colors, Spacing } from '@/constants/Colors'
+import { getAccessContext, type AccessContext } from '@/lib/access-context'
+import { getCompanyBillingProfile, saveCompanyBillingProfile } from '@/lib/company-billing-profile-store'
+
+type FormState = {
+  companyName: string
+  address: string
+  phone: string
+  invoiceRegistrationNumber: string
+  bankName: string
+  bankBranchName: string
+  bankAccountType: string
+  bankAccountNumber: string
+  bankAccountName: string
+  logoUri: string
+  defaultNote: string
+}
+
+const emptyForm: FormState = {
+  companyName: '',
+  address: '',
+  phone: '',
+  invoiceRegistrationNumber: '',
+  bankName: '',
+  bankBranchName: '',
+  bankAccountType: '',
+  bankAccountNumber: '',
+  bankAccountName: '',
+  logoUri: '',
+  defaultNote: '',
+}
+
+export default function CompanyBillingProfileScreen() {
+  const [access, setAccess] = useState<AccessContext | null>(null)
+  const [form, setForm] = useState<FormState>(emptyForm)
+
+  const canSee = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+
+  const reload = async () => {
+    const [ctx, profile] = await Promise.all([getAccessContext(), getCompanyBillingProfile()])
+    setAccess(ctx)
+
+    if (!profile) {
+      setForm(emptyForm)
+      return
+    }
+
+    setForm({
+      companyName: profile.companyName || '',
+      address: profile.address || '',
+      phone: profile.phone || '',
+      invoiceRegistrationNumber: profile.invoiceRegistrationNumber || '',
+      bankName: profile.bankName || '',
+      bankBranchName: profile.bankBranchName || '',
+      bankAccountType: profile.bankAccountType || '',
+      bankAccountNumber: profile.bankAccountNumber || '',
+      bankAccountName: profile.bankAccountName || '',
+      logoUri: profile.logoUri || '',
+      defaultNote: profile.defaultNote || '',
+    })
+  }
+
+  useEffect(() => {
+    reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      reload()
+    }, [])
+  )
+
+  const onChange = (key: keyof FormState, value: string) => {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleSave = async () => {
+    try {
+      await saveCompanyBillingProfile({
+        companyName: form.companyName,
+        address: form.address,
+        phone: form.phone,
+        invoiceRegistrationNumber: form.invoiceRegistrationNumber,
+        bankName: form.bankName,
+        bankBranchName: form.bankBranchName,
+        bankAccountType: form.bankAccountType,
+        bankAccountNumber: form.bankAccountNumber,
+        bankAccountName: form.bankAccountName,
+        logoUri: form.logoUri,
+        defaultNote: form.defaultNote,
+      })
+
+      Alert.alert('保存しました')
+      await reload()
+    } catch (e) {
+      console.error('Failed to save company billing profile', e)
+      Alert.alert('保存に失敗しました')
+    }
+  }
+
+  const renderField = (label: string, key: keyof FormState, props?: { multiline?: boolean }) => {
+    const multiline = props?.multiline
+    return (
+      <View style={{ gap: 6 }}>
+        <StyledText variant="caption" color="secondary">{label}</StyledText>
+        <TextInput
+          value={form[key]}
+          onChangeText={v => onChange(key, v)}
+          placeholder={label}
+          style={[styles.input, multiline ? styles.inputMultiline : null]}
+          multiline={!!multiline}
+        />
+      </View>
+    )
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <StyledText variant="heading2" weight="bold">会社情報（請求/見積 共通）</StyledText>
+          <StyledText variant="body" color="secondary">
+            請求書/見積書に共通で使う会社情報の保存先です（自動抽出・差し込みは今後対応）。
+          </StyledText>
+        </View>
+
+        {!canSee ? (
+          <Card variant="elevated" style={styles.infoCard}>
+            <StyledText variant="subtitle" weight="semibold">閲覧できません</StyledText>
+            <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
+              会社情報は owner / office のみ編集できます。
+            </StyledText>
+          </Card>
+        ) : (
+          <Card variant="elevated" style={styles.formCard}>
+            <View style={{ gap: Spacing.md }}>
+              {renderField('会社名 / 屋号', 'companyName')}
+              {renderField('住所', 'address', { multiline: true })}
+              {renderField('電話番号', 'phone')}
+              {renderField('インボイス番号', 'invoiceRegistrationNumber')}
+
+              <StyledText variant="subtitle" weight="semibold">振込先</StyledText>
+              {renderField('銀行名', 'bankName')}
+              {renderField('支店名', 'bankBranchName')}
+              {renderField('口座種別', 'bankAccountType')}
+              {renderField('口座番号', 'bankAccountNumber')}
+              {renderField('口座名義', 'bankAccountName')}
+
+              <StyledText variant="subtitle" weight="semibold">その他</StyledText>
+              {renderField('ロゴURI（今回は文字列のみ）', 'logoUri')}
+              {renderField('備考の定型文', 'defaultNote', { multiline: true })}
+
+              <StyledButton title="保存" variant="primary" onPress={handleSave} />
+            </View>
+          </Card>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: Spacing.md, paddingBottom: Spacing['2xl'] },
+  header: { marginBottom: Spacing.lg, paddingTop: Spacing.sm },
+  infoCard: { padding: Spacing.md },
+  formCard: { padding: Spacing.md },
+  input: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: Colors.text,
+  },
+  inputMultiline: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+})

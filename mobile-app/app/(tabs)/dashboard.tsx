@@ -84,6 +84,7 @@ export default function DashboardTab() {
   const canSeeSupportBillingCandidates = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeSupportInvoiceDrafts = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
   const canSeeInvoiceTemplates = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
+  const canSeeCompanyBillingProfile = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
     try {
@@ -510,6 +511,26 @@ export default function DashboardTab() {
             title="テンプレ管理へ"
             variant="secondary"
             onPress={() => router.push('/invoice-templates' as any)}
+          />
+        </View>
+      </Card>
+    )
+  }
+
+  const renderCompanyBillingProfileLink = () => {
+    if (!canSeeCompanyBillingProfile) return null
+
+    return (
+      <Card variant="elevated" style={styles.supportInvoiceDraftsCard}>
+        <StyledText variant="subtitle" weight="semibold">会社情報（請求/見積）</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          会社名・住所・振込先などの保存先
+        </StyledText>
+        <View style={{ marginTop: Spacing.sm }}>
+          <StyledButton
+            title="会社情報を編集"
+            variant="secondary"
+            onPress={() => router.push('/company-billing-profile' as any)}
           />
         </View>
       </Card>
@@ -1148,6 +1169,7 @@ export default function DashboardTab() {
           {renderCompanySettingsLink()}
           {renderSupportInvoiceDraftsLink()}
           {renderInvoiceTemplatesLink()}
+          {renderCompanyBillingProfileLink()}
           {renderPendingReviewsCard()}
           {renderWorkerAttendanceCard()}
           {renderPartnerWorkforceCard()}
@@ -1183,6 +1205,7 @@ export default function DashboardTab() {
         {renderCompanySettingsLink()}
         {renderSupportInvoiceDraftsLink()}
         {renderInvoiceTemplatesLink()}
+        {renderCompanyBillingProfileLink()}
 
         {renderPendingReviewsCard()}
 
