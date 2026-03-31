@@ -18,6 +18,9 @@ import { approveDailyReport, listDailyReports, StoredDailyReport } from '@/lib/d
 import { listSupportRates, SupportRate } from '@/lib/support-rate-store'
 import { listProjectIdsForMember } from '@/lib/project-membership-store'
 import { getApprovalMode, type ApprovalMode } from '@/lib/approval-mode-store'
+import { getCompanyBillingProfile } from '@/lib/company-billing-profile-store'
+import { getActiveInvoiceTemplate } from '@/lib/invoice-template-store'
+import { listSupportInvoiceDrafts } from '@/lib/support-invoice-draft-store'
 
 interface DashboardMetric {
   id: string
@@ -74,6 +77,10 @@ export default function DashboardTab() {
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [memberProjectIds, setMemberProjectIds] = useState<string[] | null>(null)
   const [approvalMode, setApprovalModeState] = useState<ApprovalMode>('owneronly')
+
+  const [invoiceSetupCompanyStatus, setInvoiceSetupCompanyStatus] = useState<'unset' | 'set'>('unset')
+  const [invoiceSetupTemplateStatus, setInvoiceSetupTemplateStatus] = useState<'unselected' | 'selected'>('unselected')
+  const [invoiceSetupDraftCount, setInvoiceSetupDraftCount] = useState<number>(0)
   const isUnassigned = access?.kind === 'unassigned'
   const isOwner = access?.kind === 'assigned' ? access.role === 'owner' : true
   const canSeeCompanySettings = access?.kind === 'assigned' && access.role === 'owner'
@@ -103,6 +110,28 @@ export default function DashboardTab() {
     }
   }
 
+  const reloadInvoiceSetupStatus = async () => {
+    if (!(access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office'))) return
+    try {
+      const [companyProfile, activeTemplate, invoiceDrafts] = await Promise.all([
+        getCompanyBillingProfile(),
+        getActiveInvoiceTemplate(),
+        listSupportInvoiceDrafts(),
+      ])
+
+      const hasCompanyInfo =
+        !!(companyProfile?.companyName || '').trim() ||
+        !!(companyProfile?.invoiceRegistrationNumber || '').trim() ||
+        !!(companyProfile?.bankName || '').trim()
+
+      setInvoiceSetupCompanyStatus(hasCompanyInfo ? 'set' : 'unset')
+      setInvoiceSetupTemplateStatus(activeTemplate ? 'selected' : 'unselected')
+      setInvoiceSetupDraftCount(Array.isArray(invoiceDrafts) ? invoiceDrafts.length : 0)
+    } catch (e) {
+      console.error('Failed to load invoice setup status', e)
+    }
+  }
+
   useEffect(() => {
     reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,13 +150,38 @@ export default function DashboardTab() {
       } else {
         setMemberProjectIds(null)
       }
+
+      if (ctx.kind === 'assigned' && (ctx.role === 'owner' || ctx.role === 'office')) {
+        try {
+          const [companyProfile, activeTemplate, invoiceDrafts] = await Promise.all([
+            getCompanyBillingProfile(),
+            getActiveInvoiceTemplate(),
+            listSupportInvoiceDrafts(),
+          ])
+
+          const hasCompanyInfo =
+            !!(companyProfile?.companyName || '').trim() ||
+            !!(companyProfile?.invoiceRegistrationNumber || '').trim() ||
+            !!(companyProfile?.bankName || '').trim()
+
+          setInvoiceSetupCompanyStatus(hasCompanyInfo ? 'set' : 'unset')
+          setInvoiceSetupTemplateStatus(activeTemplate ? 'selected' : 'unselected')
+          setInvoiceSetupDraftCount(Array.isArray(invoiceDrafts) ? invoiceDrafts.length : 0)
+        } catch (e) {
+          console.error('Failed to load invoice setup status', e)
+          setInvoiceSetupCompanyStatus('unset')
+          setInvoiceSetupTemplateStatus('unselected')
+          setInvoiceSetupDraftCount(0)
+        }
+      }
     })()
   }, [])
 
   useFocusEffect(
     React.useCallback(() => {
       reload()
-    }, [])
+      reloadInvoiceSetupStatus()
+    }, [access])
   )
 
   const projectKpis: ProjectKpi[] = useMemo(() => {
@@ -471,6 +525,47 @@ export default function DashboardTab() {
             title="招待コード管理へ"
             variant="secondary"
             onPress={() => router.push('/company/settings' as any)}
+          />
+        </View>
+      </Card>
+    )
+  }
+
+  const renderInvoiceSetupCard = () => {
+    if (!(access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office'))) return null
+
+    const companyLabel = invoiceSetupCompanyStatus === 'set' ? '設定済み' : '未設定'
+    const templateLabel = invoiceSetupTemplateStatus === 'selected' ? '選択済み' : '未選択'
+    const draftsLabel = invoiceSetupDraftCount > 0 ? `${invoiceSetupDraftCount}件` : '0件'
+
+    return (
+      <Card variant="elevated" style={styles.supportInvoiceDraftsCard}>
+        <StyledText variant="subtitle" weight="semibold">請求書セットアップ</StyledText>
+        <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+          まず会社情報→テンプレ→下書き確認の順で進めると迷いません。
+        </StyledText>
+
+        <View style={{ marginTop: Spacing.sm, gap: 6 }}>
+          <StyledText variant="caption" color="secondary">会社情報: {companyLabel}</StyledText>
+          <StyledText variant="caption" color="secondary">テンプレ: {templateLabel}</StyledText>
+          <StyledText variant="caption" color="secondary">請求書下書き: {draftsLabel}</StyledText>
+        </View>
+
+        <View style={{ marginTop: Spacing.sm, gap: Spacing.sm }}>
+          <StyledButton
+            title="会社情報を編集"
+            variant="secondary"
+            onPress={() => router.push('/company-billing-profile' as any)}
+          />
+          <StyledButton
+            title="請求書テンプレを開く"
+            variant="secondary"
+            onPress={() => router.push('/invoice-templates' as any)}
+          />
+          <StyledButton
+            title="請求書下書きを開く"
+            variant="secondary"
+            onPress={() => router.push('/support-invoice-drafts' as any)}
           />
         </View>
       </Card>
@@ -1167,9 +1262,7 @@ export default function DashboardTab() {
         >
           {renderWelcomeCard()}
           {renderCompanySettingsLink()}
-          {renderSupportInvoiceDraftsLink()}
-          {renderInvoiceTemplatesLink()}
-          {renderCompanyBillingProfileLink()}
+          {renderInvoiceSetupCard()}
           {renderPendingReviewsCard()}
           {renderWorkerAttendanceCard()}
           {renderPartnerWorkforceCard()}
@@ -1203,9 +1296,7 @@ export default function DashboardTab() {
         {renderWelcomeCard()}
 
         {renderCompanySettingsLink()}
-        {renderSupportInvoiceDraftsLink()}
-        {renderInvoiceTemplatesLink()}
-        {renderCompanyBillingProfileLink()}
+        {renderInvoiceSetupCard()}
 
         {renderPendingReviewsCard()}
 
