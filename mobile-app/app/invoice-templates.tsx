@@ -5,6 +5,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
+import { saveCompanyBillingProfile } from '@/lib/company-billing-profile-store'
 import {
   createUploadedInvoiceTemplate,
   listInvoiceTemplates,
@@ -40,6 +41,15 @@ export default function InvoiceTemplatesScreen() {
   const handleSetActive = async (id: string) => {
     await setActiveInvoiceTemplate(id)
     await reload()
+  }
+
+  const stripExtension = (name: string): string => {
+    const trimmed = String(name || '').trim()
+    if (!trimmed) return ''
+    const parts = trimmed.split('.')
+    if (parts.length <= 1) return trimmed
+    parts.pop()
+    return parts.join('.').trim()
   }
 
   const handlePickAndRegister = async () => {
@@ -95,6 +105,30 @@ export default function InvoiceTemplatesScreen() {
     if (s === 'ready_for_future_apply') return '今後適用候補'
     if (s === 'unsupported_yet') return 'まだ未対応'
     return ''
+  }
+
+  const handleApplyToCompanyProfile = async (t: InvoiceTemplate) => {
+    if (t.kind !== 'uploaded') return
+
+    try {
+      const companyNameCandidate = stripExtension(t.name)
+      if (!companyNameCandidate) {
+        Alert.alert('反映に失敗しました', '会社名候補が空です。')
+        return
+      }
+
+      const logoUriCandidate = t.fileType === 'image' ? String(t.sourceUri || '').trim() : ''
+
+      await saveCompanyBillingProfile({
+        companyName: companyNameCandidate,
+        logoUri: logoUriCandidate || undefined,
+      })
+
+      Alert.alert('会社情報へ反映しました', '会社情報（請求/見積）画面で確認・修正できます。')
+    } catch (e) {
+      console.error('Failed to apply uploaded template to company billing profile', e)
+      Alert.alert('反映に失敗しました', 'もう一度お試しください。')
+    }
   }
 
   return (
@@ -158,12 +192,20 @@ export default function InvoiceTemplatesScreen() {
                   </View>
                 </View>
 
-                <View style={{ marginTop: Spacing.sm }}>
+                <View style={{ marginTop: Spacing.sm, gap: Spacing.sm }}>
                   <StyledButton
                     title={t.isActive ? 'このテンプレを使用中' : 'このテンプレを使う'}
                     variant={t.isActive ? 'secondary' : 'primary'}
                     onPress={() => handleSetActive(t.id)}
                   />
+
+                  {t.kind === 'uploaded' ? (
+                    <StyledButton
+                      title="会社情報に取り込む"
+                      variant="secondary"
+                      onPress={() => handleApplyToCompanyProfile(t)}
+                    />
+                  ) : null}
                 </View>
               </Card>
             ))}
