@@ -9,6 +9,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Pressable,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 
@@ -1354,6 +1356,7 @@ export default function SimpleChatScreen() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const scrollViewRef = useRef<ScrollView | null>(null)
   const inputRef = useRef<TextInput | null>(null)
@@ -2654,6 +2657,13 @@ export default function SimpleChatScreen() {
     openProjectSelector()
   }
 
+  const closeMenu = () => setIsMenuOpen(false)
+
+  const navigateFromMenu = (path: string) => {
+    closeMenu()
+    router.push(path as any)
+  }
+
   const handleEmptyQuickAction = (action: EmptyQuickAction) => {
     setInputText(action.prompt)
   }
@@ -2667,6 +2677,10 @@ export default function SimpleChatScreen() {
       >
         {/* ヘッダー（チャット主役 / 現場は補助） */}
         <View style={styles.header}>
+          <TouchableOpacity style={styles.headerMenuButton} onPress={() => setIsMenuOpen(true)}>
+            <Text style={styles.headerMenuButtonText}>≡</Text>
+          </TouchableOpacity>
+
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Crafdy</Text>
             <Text style={styles.headerSubtitle}>
@@ -2683,6 +2697,44 @@ export default function SimpleChatScreen() {
             <Text style={styles.headerProjectButtonText}>現場</Text>
           </TouchableOpacity>
         </View>
+
+        {/* 左メニュー（最小導線） */}
+        <Modal
+          visible={isMenuOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={closeMenu}
+        >
+          <Pressable style={styles.menuOverlay} onPress={closeMenu}>
+            <Pressable style={styles.menuPanel} onPress={() => { /* stop propagation */ }}>
+              <Text style={styles.menuTitle}>メニュー</Text>
+
+              <View style={styles.menuItems}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/(tabs)/dashboard')}>
+                  <Text style={styles.menuItemText}>dashboard</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/project-selector')}>
+                  <Text style={styles.menuItemText}>現場</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/company-billing-profile')}>
+                  <Text style={styles.menuItemText}>会社情報</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/invoice-templates')}>
+                  <Text style={styles.menuItemText}>請求書テンプレ</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/support-invoice-drafts')}>
+                  <Text style={styles.menuItemText}>請求書下書き</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ marginTop: Spacing.md }}>
+                <TouchableOpacity style={styles.menuCloseButton} onPress={closeMenu}>
+                  <Text style={styles.menuCloseButtonText}>閉じる</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {/* メッセージ一覧 */}
         <ScrollView
@@ -2809,6 +2861,19 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.dark.border.light,
     backgroundColor: Colors.dark.background.primary,
   },
+  headerMenuButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.sm,
+  },
+  headerMenuButtonText: {
+    color: Colors.dark.text.primary,
+    fontSize: 22,
+    fontWeight: Typography.weights.bold,
+  },
   headerLeft: {
     flex: 1,
     gap: 2,
@@ -2832,6 +2897,57 @@ const styles = StyleSheet.create({
   },
   headerProjectButtonText: {
     color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    flexDirection: 'row',
+  },
+  menuPanel: {
+    width: 280,
+    height: '100%',
+    backgroundColor: Colors.dark.background.primary,
+    paddingTop: Spacing['2xl'],
+    paddingHorizontal: Spacing.lg,
+    borderRightWidth: 1,
+    borderRightColor: Colors.dark.border.light,
+  },
+  menuTitle: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+    marginBottom: Spacing.md,
+  },
+  menuItems: {
+    gap: Spacing.sm,
+  },
+  menuItem: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.dark.background.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+  },
+  menuItemText: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold,
+  },
+  menuCloseButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+    alignItems: 'center',
+  },
+  menuCloseButtonText: {
+    color: Colors.dark.text.secondary,
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
