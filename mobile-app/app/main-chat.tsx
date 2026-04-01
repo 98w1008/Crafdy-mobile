@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Platform,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+
+// NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
+const ASK_NEXT_PLAN_IN_MVP = false
 import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
 import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
 import { createExpense, ExpenseKind, submitExpense } from '@/lib/expense-store'
@@ -1162,7 +1165,7 @@ const extractInvoiceCollected = (text: string, prev: InvoiceCollected): InvoiceC
 }
 
 const isDailyReportComplete = (c: DailyReportCollected) =>
-  c.dateConfirmed && c.workConfirmed && c.workforceTimeConfirmed && c.nextPlanConfirmed
+  c.dateConfirmed && c.workConfirmed && c.workforceTimeConfirmed && (ASK_NEXT_PLAN_IN_MVP ? c.nextPlanConfirmed : true)
 
 const isInvoiceComplete = (c: InvoiceCollected) =>
   c.clientConfirmed && c.billingTargetConfirmed && c.amountConfirmed && c.dueDateConfirmed
@@ -1197,7 +1200,6 @@ const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: strin
         '・今日の日付（または「今日」でOK）',
         '・作業内容（箇条書きでOK）',
         '・人数/作業時間（分かる範囲で）',
-        '・明日の予定（あれば）',
         projectNote,
       ].join('\n')
     case 'expense':
@@ -1219,7 +1221,7 @@ const getIntentFields = (category: IntentCategory) => {
     case 'estimate':
       return ['工事/作業内容', '数量/単位', '希望納期', '現場住所']
     case 'daily_report':
-      return ['日付', '作業内容', '人数/作業時間', '明日の予定']
+      return ['日付', '作業内容', '人数/作業時間']
     case 'expense':
       return ['領収書/写真', 'いつ/どこで/何', '金額', '支払方法']
   }
@@ -1266,7 +1268,6 @@ const buildProgressSummary = (
         dailyReportCollected.dateConfirmed,
         dailyReportCollected.workConfirmed,
         dailyReportCollected.workforceTimeConfirmed,
-        dailyReportCollected.nextPlanConfirmed,
       ]
       status = flags[idx] ? '取得済み' : '未確認'
     } else if (category === 'invoice' && invoiceCollected) {
@@ -1334,7 +1335,6 @@ const buildFollowupAiReply = (
         '日付は？（「今日」でもOK）',
         '作業内容を箇条書きで教えてください。',
         '人数/作業時間は？（分かる範囲でOK）',
-        '明日の予定は？（あれば）',
       ]
       return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
@@ -1354,6 +1354,18 @@ export default function SimpleChatScreen() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
+
+  const scrollViewRef = useRef<ScrollView | null>(null)
+  const inputRef = useRef<TextInput | null>(null)
+  const scrollToBottom = (delayMs = 0) => {
+    setTimeout(() => {
+      try {
+        scrollViewRef.current?.scrollToEnd({ animated: true })
+      } catch {
+        // ignore
+      }
+    }, delayMs)
+  }
   const [selectedProject, setSelectedProjectState] = useState<SelectedProject>(null)
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<{ address?: string; memo?: string; revenue?: number } | null>(null)
 
@@ -1492,6 +1504,8 @@ export default function SimpleChatScreen() {
 
     setMessages(prev => [...prev, userMessage])
     setInputText('')
+    scrollToBottom(10)
+    setTimeout(() => inputRef.current?.focus(), 20)
 
     // 経費なし（最小導線）: 直前に保存した日報を「経費なし確認済み」にする
     const isNoExpense = /(経費なし|今日は経費なし|本日経費なし|経費はない)/.test(trimmed)
@@ -1915,7 +1929,7 @@ export default function SimpleChatScreen() {
           return
         }
 
-        if (!normalized.nextPlan) {
+        if (ASK_NEXT_PLAN_IN_MVP && !normalized.nextPlan) {
           setDailyReportDraft(normalized)
           setIsDailyReportIntake(true)
           const aiMessage: Message = {
@@ -1954,7 +1968,7 @@ export default function SimpleChatScreen() {
             date: normalized.date!,
             work: normalized.work!,
             workforceTime: normalized.workforceTime!,
-            nextPlan: normalized.nextPlan!,
+            nextPlan: normalized.nextPlan ?? '',
             selfWorkersCount: inferredSelfCount,
             partnerWorkers,
             selfWorkerIds: selfStaff.ids,
@@ -2048,7 +2062,7 @@ export default function SimpleChatScreen() {
           return
         }
 
-        if (!normalized.nextPlan) {
+        if (ASK_NEXT_PLAN_IN_MVP && !normalized.nextPlan) {
           setDailyReportDraft(normalized)
           setIsDailyReportIntake(true)
           const aiMessage: Message = {
@@ -2085,7 +2099,7 @@ export default function SimpleChatScreen() {
             date: normalized.date!,
             work: normalized.work!,
             workforceTime: normalized.workforceTime!,
-            nextPlan: normalized.nextPlan!,
+            nextPlan: normalized.nextPlan ?? '',
             selfWorkersCount: inferredSelfCount,
             partnerWorkers,
             selfWorkerIds: selfStaff.ids,
@@ -2627,6 +2641,12 @@ export default function SimpleChatScreen() {
     }, 500)
   }
 
+  useEffect(() => {
+    // NOTE: 送信後/AI返答後に自然に最下部へ（タイミングずれ対策で少し遅延）
+    if (messages.length > 0) scrollToBottom(30)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length])
+
   const canSend = !!inputText.trim()
   const isEmpty = messages.length === 0
 
@@ -2643,7 +2663,7 @@ export default function SimpleChatScreen() {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         {/* ヘッダー（チャット主役 / 現場は補助） */}
         <View style={styles.header}>
@@ -2665,7 +2685,13 @@ export default function SimpleChatScreen() {
         </View>
 
         {/* メッセージ一覧 */}
-        <ScrollView style={styles.messagesContainer} contentContainerStyle={styles.messagesContent}>
+        <ScrollView
+          ref={(r) => { scrollViewRef.current = r }}
+          style={styles.messagesContainer}
+          contentContainerStyle={styles.messagesContent}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollToBottom(10)}
+        >
           {isEmpty ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>今日は何を作りますか？</Text>
@@ -2710,6 +2736,7 @@ export default function SimpleChatScreen() {
         {/* 入力欄（常に有効） */}
         <View style={styles.inputContainer}>
           <TextInput
+            ref={(r) => { inputRef.current = r }}
             style={styles.input}
             value={inputText}
             onChangeText={setInputText}
