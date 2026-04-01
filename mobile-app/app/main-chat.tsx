@@ -48,6 +48,7 @@ type SelectedProject = { id: string; name: string } | null
 type EmptyQuickAction = {
   id: 'invoice' | 'estimate' | 'daily_report' | 'expense'
   label: string
+  hint: string
   prompt: string
 }
 
@@ -1411,21 +1412,25 @@ export default function SimpleChatScreen() {
     {
       id: 'invoice',
       label: '請求書',
+      hint: '下書き作成・プレビュー',
       prompt: '請求書を作りたいです。必要な情報を聞いてください。',
     },
     {
       id: 'estimate',
       label: '見積',
+      hint: '内訳たたき台 → 修正',
       prompt: '見積を作りたいです。必要な情報を聞いてください。',
     },
     {
       id: 'daily_report',
       label: '日報',
+      hint: '今日の作業を整理',
       prompt: '日報を作りたいです。今日の作業内容を整理したいです。',
     },
     {
       id: 'expense',
       label: '経費',
+      hint: '材料費/外注費もOK',
       prompt: '経費（材料費/外注費含む）を整理したいです。まず何を出せばいいですか？',
     },
   ]
@@ -2746,20 +2751,22 @@ export default function SimpleChatScreen() {
         >
           {isEmpty ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>今日は何を作りますか？</Text>
+              <Text style={styles.emptyStateText}>今日なにをしますか？</Text>
               <Text style={styles.emptyStateSubtext}>
-                請求書・見積・日報を、チャットで作れます。{'\n'}
-                材料費や経費の整理もOK。現場は後から選択できます。
+                請求書・見積・日報・経費を、チャットで作れます。{'\n'}
+                現場はあとから選べます（右上「現場」）。
               </Text>
+              <Text style={styles.emptyStateHint}>まずはボタンを押すか、下で自由に入力してください。</Text>
 
               <View style={styles.emptyQuickActionsRow}>
                 {emptyQuickActions.map(action => (
                   <TouchableOpacity
                     key={action.id}
-                    style={styles.emptyQuickActionChip}
+                    style={styles.emptyQuickActionButton}
                     onPress={() => handleEmptyQuickAction(action)}
                   >
-                    <Text style={styles.emptyQuickActionChipText}>{action.label}</Text>
+                    <Text style={styles.emptyQuickActionButtonLabel}>{action.label}</Text>
+                    <Text style={styles.emptyQuickActionButtonHint}>{action.hint}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -2794,8 +2801,8 @@ export default function SimpleChatScreen() {
             onChangeText={setInputText}
             placeholder={
               selectedProject
-                ? '例）この現場の見積を作って。写真も貼れます'
-                : '例）○○邸の請求書作って。現場はあとで選べます'
+                ? '例）この現場の見積を作って / 日報つけたい'
+                : '例）請求書作って / 経費12000円 / 現場はあとでOK'
             }
             placeholderTextColor={Colors.dark.text.tertiary}
             multiline
@@ -2962,41 +2969,55 @@ const styles = StyleSheet.create({
   emptyState: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'stretch',
     paddingHorizontal: Spacing.xl,
-    marginTop: 60,
+    marginTop: 44,
   },
   emptyStateText: {
     color: Colors.dark.text.primary,
-    fontSize: Typography.sizes.lg,
+    fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
   emptyStateSubtext: {
     color: Colors.dark.text.secondary,
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.sm,
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: Spacing.sm,
+  },
+  emptyStateHint: {
+    color: Colors.dark.text.tertiary,
+    fontSize: Typography.sizes.xs,
+    textAlign: 'center',
     marginBottom: Spacing.lg,
   },
   emptyQuickActionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     gap: Spacing.sm,
   },
-  emptyQuickActionChip: {
+  emptyQuickActionButton: {
+    width: '48%',
+    minHeight: 76,
     backgroundColor: Colors.dark.background.surface,
     borderWidth: 1,
     borderColor: Colors.dark.border.medium,
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
   },
-  emptyQuickActionChipText: {
+  emptyQuickActionButtonLabel: {
     color: Colors.dark.text.primary,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.bold,
+    marginBottom: 2,
+  },
+  emptyQuickActionButtonHint: {
+    color: Colors.dark.text.secondary,
+    fontSize: Typography.sizes.xs,
   },
   messageBubble: {
     maxWidth: '88%',
