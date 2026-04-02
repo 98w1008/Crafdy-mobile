@@ -2751,24 +2751,26 @@ export default function SimpleChatScreen() {
         >
           {isEmpty ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>今日なにをしますか？</Text>
-              <Text style={styles.emptyStateSubtext}>
-                請求書・見積・日報・経費を、チャットで作れます。{'\n'}
-                現場はあとから選べます（右上「現場」）。
-              </Text>
-              <Text style={styles.emptyStateHint}>まずはボタンを押すか、下で自由に入力してください。</Text>
+              <View style={styles.emptyHeroCard}>
+                <Text style={styles.emptyStateText}>今日なにをしますか？</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  請求書・見積・日報・経費を、チャットで作れます。{'\n'}
+                  現場はあとから選べます（右上「現場」）。
+                </Text>
+                <Text style={styles.emptyStateHint}>ボタンを押すか、下で自由に入力してください。</Text>
 
-              <View style={styles.emptyQuickActionsRow}>
-                {emptyQuickActions.map(action => (
-                  <TouchableOpacity
-                    key={action.id}
-                    style={styles.emptyQuickActionButton}
-                    onPress={() => handleEmptyQuickAction(action)}
-                  >
-                    <Text style={styles.emptyQuickActionButtonLabel}>{action.label}</Text>
-                    <Text style={styles.emptyQuickActionButtonHint}>{action.hint}</Text>
-                  </TouchableOpacity>
-                ))}
+                <View style={styles.emptyQuickActionsRow}>
+                  {emptyQuickActions.map(action => (
+                    <TouchableOpacity
+                      key={action.id}
+                      style={styles.emptyQuickActionButton}
+                      onPress={() => handleEmptyQuickAction(action)}
+                    >
+                      <Text style={styles.emptyQuickActionButtonLabel}>{action.label}</Text>
+                      <Text style={styles.emptyQuickActionButtonHint}>{action.hint}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
           ) : (
@@ -2861,8 +2863,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border.light,
@@ -2875,6 +2877,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.sm,
+    backgroundColor: Colors.dark.background.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
   },
   headerMenuButtonText: {
     color: Colors.dark.text.primary,
@@ -2901,6 +2906,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.dark.border.medium,
     backgroundColor: Colors.dark.background.surface,
+    marginLeft: Spacing.sm,
   },
   headerProjectButtonText: {
     color: Colors.dark.text.primary,
@@ -2968,10 +2974,18 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'stretch',
     paddingHorizontal: Spacing.xl,
-    marginTop: 44,
+    paddingTop: Spacing.lg,
+  },
+  emptyHeroCard: {
+    backgroundColor: Colors.dark.background.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    ...Shadows.lg,
   },
   emptyStateText: {
     color: Colors.dark.text.primary,
@@ -2991,29 +3005,29 @@ const styles = StyleSheet.create({
     color: Colors.dark.text.tertiary,
     fontSize: Typography.sizes.xs,
     textAlign: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   emptyQuickActionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   emptyQuickActionButton: {
     width: '48%',
-    minHeight: 76,
-    backgroundColor: Colors.dark.background.surface,
+    minHeight: 86,
+    backgroundColor: Colors.dark.background.primary,
     borderWidth: 1,
     borderColor: Colors.dark.border.medium,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   emptyQuickActionButtonLabel: {
     color: Colors.dark.text.primary,
-    fontSize: Typography.sizes.base,
+    fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   emptyQuickActionButtonHint: {
     color: Colors.dark.text.secondary,
