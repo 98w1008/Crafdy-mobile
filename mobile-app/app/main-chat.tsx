@@ -1178,42 +1178,16 @@ const buildFirstAiReply = (category: IntentCategory, selectedProjectName?: strin
     ? `（現場: ${selectedProjectName}）`
     : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
 
+  // NOTE: 初回は「1つだけ」聞く（フォーム感を減らす）
   switch (category) {
     case 'invoice':
-      return [
-        'OK。請求書を作ります。まず次を教えてください。',
-        '・宛名（取引先名）',
-        '・請求対象（工事名 / 対象期間）',
-        '・金額（内訳があれば内訳も）',
-        '・支払期日',
-        projectNote,
-      ].join('\n')
+      return [`了解。請求書つくります。宛名（取引先名）は？`, projectNote].join('\n')
     case 'estimate':
-      return [
-        'OK。見積を作ります。まず次を教えてください。',
-        '・工事/作業内容（何をするか）',
-        '・数量/単位（ざっくりでもOK）',
-        '・希望納期（いつまで）',
-        '・現場住所（分かる範囲で）',
-        projectNote,
-      ].join('\n')
+      return [`了解。見積つくります。作業内容は？`, projectNote].join('\n')
     case 'daily_report':
-      return [
-        'OK。日報をまとめます。まず次を教えてください。',
-        '・今日の日付（または「今日」でOK）',
-        '・作業内容（箇条書きでOK）',
-        '・人数/作業時間（分かる範囲で）',
-        projectNote,
-      ].join('\n')
+      return [`了解。日報まとめます。日付は？（今日でもOK）`, projectNote].join('\n')
     case 'expense':
-      return [
-        'OK。経費を整理します。まず次を教えてください。',
-        '・領収書/写真はありますか？（あれば添付）',
-        '・いつ/どこで/何を買った（支払った）か',
-        '・金額（税込）',
-        '・支払方法（現金/カード/振込など）',
-        projectNote,
-      ].join('\n')
+      return [`了解。経費まとめます。領収書/写真ある？（あれば添付）`, projectNote].join('\n')
   }
 }
 
@@ -1248,7 +1222,7 @@ const buildProgressSummary = (
   // - 既存カテゴリは step を「ここまで回答済み（とみなす）」
   // - expense は抽出結果（expenseCollected）を優先
   const lines = fields.map((label, idx) => {
-    let status: '取得済み' | '未確認'
+    let status: 'OK' | 'まだ'
 
     if (category === 'expense' && expenseCollected) {
       const flags = [
@@ -1257,7 +1231,7 @@ const buildProgressSummary = (
         expenseCollected.amountConfirmed,
         expenseCollected.paymentMethodConfirmed,
       ]
-      status = flags[idx] ? '取得済み' : '未確認'
+      status = flags[idx] ? 'OK' : 'まだ'
     } else if (category === 'estimate' && estimateCollected) {
       const flags = [
         estimateCollected.workConfirmed,
@@ -1265,14 +1239,14 @@ const buildProgressSummary = (
         estimateCollected.dueDateConfirmed,
         estimateCollected.locationConfirmed,
       ]
-      status = flags[idx] ? '取得済み' : '未確認'
+      status = flags[idx] ? 'OK' : 'まだ'
     } else if (category === 'daily_report' && dailyReportCollected) {
       const flags = [
         dailyReportCollected.dateConfirmed,
         dailyReportCollected.workConfirmed,
         dailyReportCollected.workforceTimeConfirmed,
       ]
-      status = flags[idx] ? '取得済み' : '未確認'
+      status = flags[idx] ? 'OK' : 'まだ'
     } else if (category === 'invoice' && invoiceCollected) {
       const flags = [
         invoiceCollected.clientConfirmed,
@@ -1280,15 +1254,15 @@ const buildProgressSummary = (
         invoiceCollected.amountConfirmed,
         invoiceCollected.dueDateConfirmed,
       ]
-      status = flags[idx] ? '取得済み' : '未確認'
+      status = flags[idx] ? 'OK' : 'まだ'
     } else {
-      status = idx < step ? '取得済み' : '未確認'
+      status = idx < step ? 'OK' : 'まだ'
     }
 
     return `・${label}: ${status}`
   })
 
-  return ['進捗:', ...lines].join('\n')
+  return ['いまの状況:', ...lines].join('\n')
 }
 
 const buildFollowupAiReply = (
@@ -1317,38 +1291,38 @@ const buildFollowupAiReply = (
   switch (category) {
     case 'invoice': {
       const questions = [
-        '宛名（取引先名）は？',
-        '請求対象（工事名 / 対象期間）は？',
-        '金額はいくらですか？（内訳があれば内訳も）',
-        '支払期日はいつですか？',
+        '宛名は？',
+        '請求対象は？（工事名 / 対象期間）',
+        '金額はいくら？（内訳があれば内訳も）',
+        '支払期日は？',
       ]
-      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'estimate': {
       const questions = [
-        '工事/作業内容は？（何をするか）',
-        '数量/単位は？（ざっくりでもOK）',
-        '希望納期は？（いつまで）',
-        '現場住所は分かりますか？（分かる範囲でOK）',
+        '作業内容は？',
+        '数量/単位は？（ざっくりでOK）',
+        '希望納期は？',
+        '現場住所は？（分かる範囲でOK）',
       ]
-      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'daily_report': {
       const questions = [
-        '日付は？（「今日」でもOK）',
-        '作業内容を箇条書きで教えてください。',
+        '日付は？（今日でもOK）',
+        '作業内容は？（箇条書きでOK）',
         '人数/作業時間は？（分かる範囲でOK）',
       ]
-      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'expense': {
       const questions = [
-        '領収書/写真はありますか？（あれば添付してください）',
-        'いつ/どこで/何を買った（支払った）か教えてください。',
-        '金額（税込）は？',
+        '領収書/写真ある？（あれば添付）',
+        'いつ/どこで/何に使った？',
+        '金額はいくら？（税込）',
         '支払方法は？（現金/カード/振込など）',
       ]
-      return `${progress}\n\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
   }
 }
@@ -2397,7 +2371,7 @@ export default function SimpleChatScreen() {
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: '了解。現場は未選択のままでも進められます（必要なら右上の「現場」から選択/作成できます）。\n\nまずは何を作りたいですか？（例：請求書/見積/日報/経費整理）',
+        text: '現場は未選択のままでもOKです。まず何を作る？（請求書 / 見積 / 日報 / 経費）',
         sender: 'ai',
         timestamp: new Date(),
       }
@@ -2423,7 +2397,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('expense', 0, nextCollected, undefined, undefined, undefined)}\n\nOK。必要な情報が揃いました。次は「用途（経費区分）」や「対象期間」も必要なら聞きます。`,
+            text: `${buildProgressSummary('expense', 0, nextCollected, undefined, undefined, undefined)}\n必要な情報そろいました。次は保存します。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2461,7 +2435,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('invoice', 0, undefined, undefined, undefined, nextCollected)}\n\nOK。請求書のたたき台に必要な情報が揃いました。必要なら「振込先」「備考」「インボイス要件」も追記できます。`,
+            text: `${buildProgressSummary('invoice', 0, undefined, undefined, undefined, nextCollected)}\n必要な情報そろいました。下書きを作ります。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2497,7 +2471,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('daily_report', 0, undefined, undefined, nextCollected, undefined)}\n\nOK。日報に必要な情報が揃いました。必要なら「写真」や「気づき/ヒヤリ」も追記できます。`,
+            text: `${buildProgressSummary('daily_report', 0, undefined, undefined, nextCollected, undefined)}\n必要な情報そろいました。保存します。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2537,9 +2511,13 @@ export default function SimpleChatScreen() {
           const nextIndex = flags.findIndex(v => !v)
 
           if (nextIndex === -1) {
+            const projectNote = selectedProject?.name
+              ? `（現場: ${selectedProject.name}）`
+              : '（現場: 未選択。必要なら右上の「現場」から選択/作成できます）'
+
             const aiMessage: Message = {
               id: (Date.now() + 1).toString(),
-              text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined, undefined)}\n\nOK。見積の土台が揃いました。次に、以下3点を教えてください。\n・元請け/顧客名（誰に出す見積ですか？）\n・価格方針（攻め / 標準 / 慎重）\n・希望粗利率（%）`,
+              text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined, undefined)}\n\n土台できました。元請け/顧客名は？\n${projectNote}`,
               sender: 'ai',
               timestamp: new Date(),
             }
