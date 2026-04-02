@@ -1259,10 +1259,12 @@ const buildProgressSummary = (
       status = idx < step ? 'OK' : 'まだ'
     }
 
-    return `・${label}: ${status}`
+    const mark = status === 'OK' ? '✓' : '□'
+    const tail = status === 'OK' ? 'OK' : 'まだ'
+    return `${mark} ${label}  ${tail}`
   })
 
-  return ['いまの状況:', ...lines].join('\n')
+  return ['【いまの状況】', ...lines].join('\n')
 }
 
 const buildFollowupAiReply = (
@@ -1296,7 +1298,7 @@ const buildFollowupAiReply = (
         '金額はいくら？（内訳があれば内訳も）',
         '支払期日は？',
       ]
-      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'estimate': {
       const questions = [
@@ -1305,7 +1307,7 @@ const buildFollowupAiReply = (
         '希望納期は？',
         '現場住所は？（分かる範囲でOK）',
       ]
-      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'daily_report': {
       const questions = [
@@ -1313,7 +1315,7 @@ const buildFollowupAiReply = (
         '作業内容は？（箇条書きでOK）',
         '人数/作業時間は？（分かる範囲でOK）',
       ]
-      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'expense': {
       const questions = [
@@ -1322,7 +1324,7 @@ const buildFollowupAiReply = (
         '金額はいくら？（税込）',
         '支払方法は？（現金/カード/振込など）',
       ]
-      return `${progress}\n${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
   }
 }
@@ -2397,7 +2399,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('expense', 0, nextCollected, undefined, undefined, undefined)}\n必要な情報そろいました。次は保存します。`,
+            text: `${buildProgressSummary('expense', 0, nextCollected, undefined, undefined, undefined)}\n\n✅ そろいました。保存します。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2435,7 +2437,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('invoice', 0, undefined, undefined, undefined, nextCollected)}\n必要な情報そろいました。下書きを作ります。`,
+            text: `${buildProgressSummary('invoice', 0, undefined, undefined, undefined, nextCollected)}\n\n✅ そろいました。下書きを作ります。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2471,7 +2473,7 @@ export default function SimpleChatScreen() {
         if (nextIndex === -1) {
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `${buildProgressSummary('daily_report', 0, undefined, undefined, nextCollected, undefined)}\n必要な情報そろいました。保存します。`,
+            text: `${buildProgressSummary('daily_report', 0, undefined, undefined, nextCollected, undefined)}\n\n✅ そろいました。保存します。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2517,7 +2519,7 @@ export default function SimpleChatScreen() {
 
             const aiMessage: Message = {
               id: (Date.now() + 1).toString(),
-              text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined, undefined)}\n\n土台できました。元請け/顧客名は？\n${projectNote}`,
+              text: `${buildProgressSummary('estimate', 0, undefined, nextCollected, undefined, undefined)}\n\n✅ 土台できました。\n\n👉 元請け/顧客名は？\n${projectNote}`,
               sender: 'ai',
               timestamp: new Date(),
             }
