@@ -1682,7 +1682,7 @@ export default function SimpleChatScreen() {
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: `OKです。${saved.companyName}の今月請求書下書きを作成しました。常用${billing.jyouyouWorkersTotal}人工 / 応援${billing.ouenWorkersTotal}人工 / 小計¥${saved.subtotal.toLocaleString('ja-JP')}です。`,
+          text: `OKです。${saved.companyName}の今月請求書下書きを作りました（小計¥${saved.subtotal.toLocaleString('ja-JP')}）。\n確認するなら左上メニュー → 請求書下書きへ。`,
           sender: 'ai',
           timestamp: new Date(),
         }
@@ -1974,7 +1974,7 @@ export default function SimpleChatScreen() {
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OKです。${supportMeta.companyName}の${supportMeta.supportType === 'ouen' ? '応援' : '常用'}日報を保存しました。`,
+            text: `保存しました。${supportMeta.companyName}の${supportMeta.supportType === 'ouen' ? '応援' : '常用'}日報です。\n次：今月分の請求書下書きを作る/確認するなら左上メニュー → 請求書下書きへ。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2111,7 +2111,7 @@ export default function SimpleChatScreen() {
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。[${selectedProject.name}] に ${saved.date} の日報（${saved.work}）を保存しました。${demenText ? `\n${demenText}` : ''}${selfStaffText ? `\n${selfStaffText}` : ''}\n経費が無ければ「経費なし」と送ってください。\n確認依頼する場合は「確認依頼」と送ってください。`,
+            text: `保存しました。[${selectedProject.name}] ${saved.date} の日報です。${demenText ? `\n${demenText}` : ''}${selfStaffText ? `\n${selfStaffText}` : ''}\n次：経費が無ければ「経費なし」。続けて入れるならそのまま経費を送ってOK。\n確認依頼なら「確認依頼」。`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2204,7 +2204,7 @@ export default function SimpleChatScreen() {
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `OK。[${selectedProject.name}] に ${kindLabel} ¥${saved.amount.toLocaleString('ja-JP')} を保存しました。\n確認依頼する場合は「確認依頼」と送ってください。`,
+            text: `保存しました。[${selectedProject.name}] ${kindLabel} ¥${saved.amount.toLocaleString('ja-JP')}。\n次：続けて別の経費も入力できます。確認依頼なら「確認依頼」。`,
             sender: 'ai',
             timestamp: new Date(),
           }
