@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, SafeAreaView, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
@@ -35,32 +35,50 @@ const emptyForm: FormState = {
 }
 
 export default function CompanyBillingProfileScreen() {
+  const { companyNameCandidate, logoUriCandidate, sourceTemplateName } = useLocalSearchParams<{
+    companyNameCandidate?: string
+    logoUriCandidate?: string
+    sourceTemplateName?: string
+  }>()
+
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
 
   const canSee = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
+  const hasTemplateCandidates =
+    !!String(companyNameCandidate || '').trim() ||
+    !!String(logoUriCandidate || '').trim() ||
+    !!String(sourceTemplateName || '').trim()
+
   const reload = async () => {
     const [ctx, profile] = await Promise.all([getAccessContext(), getCompanyBillingProfile()])
     setAccess(ctx)
 
-    if (!profile) {
-      setForm(emptyForm)
-      return
-    }
+    const next: FormState = profile
+      ? {
+        companyName: profile.companyName || '',
+        address: profile.address || '',
+        phone: profile.phone || '',
+        invoiceRegistrationNumber: profile.invoiceRegistrationNumber || '',
+        bankName: profile.bankName || '',
+        bankBranchName: profile.bankBranchName || '',
+        bankAccountType: profile.bankAccountType || '',
+        bankAccountNumber: profile.bankAccountNumber || '',
+        bankAccountName: profile.bankAccountName || '',
+        logoUri: profile.logoUri || '',
+        defaultNote: profile.defaultNote || '',
+      }
+      : emptyForm
+
+    // 候補つきで来た場合は、フォームが空の項目にだけ反映する（既存値は上書きしない）
+    const nameC = String(companyNameCandidate || '').trim()
+    const logoC = String(logoUriCandidate || '').trim()
 
     setForm({
-      companyName: profile.companyName || '',
-      address: profile.address || '',
-      phone: profile.phone || '',
-      invoiceRegistrationNumber: profile.invoiceRegistrationNumber || '',
-      bankName: profile.bankName || '',
-      bankBranchName: profile.bankBranchName || '',
-      bankAccountType: profile.bankAccountType || '',
-      bankAccountNumber: profile.bankAccountNumber || '',
-      bankAccountName: profile.bankAccountName || '',
-      logoUri: profile.logoUri || '',
-      defaultNote: profile.defaultNote || '',
+      ...next,
+      companyName: next.companyName.trim() ? next.companyName : nameC,
+      logoUri: next.logoUri.trim() ? next.logoUri : logoC,
     })
   }
 
@@ -74,6 +92,8 @@ export default function CompanyBillingProfileScreen() {
       reload()
     }, [])
   )
+
+  // NOTE: テンプレ候補の反映は reload() 内で行う（既存値は上書きしない）
 
   const onChange = (key: keyof FormState, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -137,27 +157,43 @@ export default function CompanyBillingProfileScreen() {
             </StyledText>
           </Card>
         ) : (
-          <Card variant="elevated" style={styles.formCard}>
-            <View style={{ gap: Spacing.md }}>
-              {renderField('会社名 / 屋号', 'companyName')}
-              {renderField('住所', 'address', { multiline: true })}
-              {renderField('電話番号', 'phone')}
-              {renderField('インボイス番号', 'invoiceRegistrationNumber')}
+          <View style={{ gap: Spacing.md }}>
+            {hasTemplateCandidates ? (
+              <Card variant="elevated" style={styles.infoCard}>
+                <StyledText variant="subtitle" weight="semibold">テンプレからの取り込み候補</StyledText>
+                <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
+                  テンプレから取り込んだ候補です。必要なら修正して保存してください。
+                </StyledText>
+                {String(sourceTemplateName || '').trim() ? (
+                  <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
+                    取り込み元: {String(sourceTemplateName || '').trim()}
+                  </StyledText>
+                ) : null}
+              </Card>
+            ) : null}
 
-              <StyledText variant="subtitle" weight="semibold">振込先</StyledText>
-              {renderField('銀行名', 'bankName')}
-              {renderField('支店名', 'bankBranchName')}
-              {renderField('口座種別', 'bankAccountType')}
-              {renderField('口座番号', 'bankAccountNumber')}
-              {renderField('口座名義', 'bankAccountName')}
+            <Card variant="elevated" style={styles.formCard}>
+              <View style={{ gap: Spacing.md }}>
+                {renderField('会社名 / 屋号', 'companyName')}
+                {renderField('住所', 'address', { multiline: true })}
+                {renderField('電話番号', 'phone')}
+                {renderField('インボイス番号', 'invoiceRegistrationNumber')}
 
-              <StyledText variant="subtitle" weight="semibold">その他</StyledText>
-              {renderField('ロゴURI（今回は文字列のみ）', 'logoUri')}
-              {renderField('備考の定型文', 'defaultNote', { multiline: true })}
+                <StyledText variant="subtitle" weight="semibold">振込先</StyledText>
+                {renderField('銀行名', 'bankName')}
+                {renderField('支店名', 'bankBranchName')}
+                {renderField('口座種別', 'bankAccountType')}
+                {renderField('口座番号', 'bankAccountNumber')}
+                {renderField('口座名義', 'bankAccountName')}
 
-              <StyledButton title="保存" variant="primary" onPress={handleSave} />
-            </View>
-          </Card>
+                <StyledText variant="subtitle" weight="semibold">その他</StyledText>
+                {renderField('ロゴURI（今回は文字列のみ）', 'logoUri')}
+                {renderField('備考の定型文', 'defaultNote', { multiline: true })}
+
+                <StyledButton title="保存" variant="primary" onPress={handleSave} />
+              </View>
+            </Card>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>

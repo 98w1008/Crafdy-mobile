@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import * as DocumentPicker from 'expo-document-picker'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
-import { saveCompanyBillingProfile } from '@/lib/company-billing-profile-store'
 import {
   createUploadedInvoiceTemplate,
   listInvoiceTemplates,
@@ -16,6 +15,7 @@ import {
 } from '@/lib/invoice-template-store'
 
 export default function InvoiceTemplatesScreen() {
+  const router = useRouter()
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([])
 
@@ -107,28 +107,20 @@ export default function InvoiceTemplatesScreen() {
     return ''
   }
 
-  const handleApplyToCompanyProfile = async (t: InvoiceTemplate) => {
+  const handleApplyToCompanyProfile = (t: InvoiceTemplate) => {
     if (t.kind !== 'uploaded') return
 
-    try {
-      const companyNameCandidate = stripExtension(t.name)
-      if (!companyNameCandidate) {
-        Alert.alert('反映に失敗しました', '会社名候補が空です。')
-        return
-      }
+    const companyNameCandidate = stripExtension(t.name)
+    const logoUriCandidate = t.fileType === 'image' ? String(t.sourceUri || '').trim() : ''
 
-      const logoUriCandidate = t.fileType === 'image' ? String(t.sourceUri || '').trim() : ''
-
-      await saveCompanyBillingProfile({
-        companyName: companyNameCandidate,
-        logoUri: logoUriCandidate || undefined,
-      })
-
-      Alert.alert('会社情報へ反映しました', '会社情報（請求/見積）画面で確認・修正できます。')
-    } catch (e) {
-      console.error('Failed to apply uploaded template to company billing profile', e)
-      Alert.alert('反映に失敗しました', 'もう一度お試しください。')
-    }
+    router.push({
+      pathname: '/company-billing-profile',
+      params: {
+        companyNameCandidate: companyNameCandidate || undefined,
+        logoUriCandidate: logoUriCandidate || undefined,
+        sourceTemplateName: String(t.name || '').trim() || undefined,
+      },
+    } as any)
   }
 
   return (
