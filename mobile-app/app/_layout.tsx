@@ -79,9 +79,16 @@ function AppShell({ loaded }: { loaded: boolean }) {
   const pathname = usePathname();
   const searchParams = useLocalSearchParams<{ project?: string }>()
   const isAuthRoute = pathname?.startsWith('/(auth)');
-  const { user } = useAuth();
+  const { user, authStatus } = useAuth();
   const [chatOnly, setChatOnly] = useState(false)
   const showFab = !!user && !isAuthRoute && !chatOnly;
+
+  // signed_out のときは認証画面へ（本格ログインは次PRで差し込み）
+  useEffect(() => {
+    if (isAuthRoute) return
+    if (authStatus !== 'signed_out') return
+    router.replace('/(auth)/auth-screen' as any)
+  }, [authStatus, isAuthRoute])
 
   // Load Chat-only toggle
   useEffect(() => {
