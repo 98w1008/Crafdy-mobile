@@ -73,10 +73,7 @@ function NavigationWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function RootLayout() {
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+function AppShell({ loaded }: { loaded: boolean }) {
   const [isReady, setIsReady] = useState(false);
   // Hooks must not be conditional: call here before any early return
   const pathname = usePathname();
@@ -203,4 +200,12 @@ export default function RootLayout() {
       </AuthProvider>
     </StripeProvider>
   );
+}
+
+export default function RootLayout() {
+  const [loaded] = useFonts({
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+  });
+
+  return <AppShell loaded={!!loaded} />
 }

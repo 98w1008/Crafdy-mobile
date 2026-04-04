@@ -27,6 +27,10 @@ interface ProjectAccess {
   ended_at?: string
 }
 
+type AuthStatus = 'preparing' | 'signed_out' | 'signed_in'
+
+type AuthMode = 'anonymous' | 'authenticated' | null
+
 interface AuthContextType {
   user: User | null
   session: Session | null
@@ -35,6 +39,8 @@ interface AuthContextType {
   profile: UserProfile | null
   projectAccess: ProjectAccess[]
   loading: boolean
+  authStatus: AuthStatus
+  authMode: AuthMode
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   refreshProjectAccess: () => Promise<void>
@@ -56,6 +62,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [projectAccess, setProjectAccess] = useState<ProjectAccess[]>([])
   const [loading, setLoading] = useState(true)
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('preparing')
+  const [authMode, setAuthMode] = useState<AuthMode>(null)
+  const [demoFlag, setDemoFlag] = useState(false)
 
   // 重複実行防止用のRef
   const isFetchingAccessRef = React.useRef(false)
@@ -249,6 +258,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     loadDemoFlag()
       .then(async flag => {
+        setDemoFlag(!!flag)
         if (!flag || !supabase || !supabaseReady) return
         const { data } = await supabase.auth.getSession()
         // Phase 1 Option C: token-store 同期
@@ -293,6 +303,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setStoredAccessToken(currentSession.access_token)
       accessTokenRef.current = currentSession.access_token
       setUser(currentSession.user)
+      setAuthStatus('signed_in')
+      setAuthMode(currentSession.user?.is_anonymous ? 'anonymous' : 'authenticated')
 
       try {
         await ensureProfile(currentSession.user.id, currentSession.user.email)
@@ -342,10 +354,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null)
           setProfile(null)
           setProjectAccess([])
+          setAuthStatus('signed_out')
+          setAuthMode(null)
         }
 
         if (mounted) {
           setLoading(false)
+          if (!currentSession) setAuthStatus('signed_out')
         }
       }
     )
@@ -368,40 +383,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.log('🔐 Initial session found:', session.user.id)
           await setupSession(session)
         } else {
-          console.log('🔐 No initial session found, attempting anonymous sign-in...')
-          try {
-            const { data: anonData, error: anonError } = await supabase!.auth.signInAnonymously()
-            if (anonError) {
-              const msg = (anonError as any)?.message?.toString?.() || String(anonError || '')
+          // NOTE: 匿名サインインはデモ用途に限定（正式運用に向け、未ログイン分岐を置けるようにする）
+          if (demoFlag) {
+            console.log('🔐 No initial session found, attempting anonymous sign-in (demo only)...')
+            try {
+              const { data: anonData, error: anonError } = await supabase!.auth.signInAnonymously()
+              if (anonError) {
+                const msg = (anonError as any)?.message?.toString?.() || String(anonError || '')
+                const probe = await probeAuthSettingsOnce()
+                const cause = msg.includes('Invalid API key')
+                  ? 'Invalid API key'
+                  : msg.includes('Network request failed')
+                    ? 'Network request failed'
+                    : (probe.status === 401 || probe.status === 403)
+                      ? `key mismatch (probe status=${probe.status})`
+                      : probe.err
+                        ? `network unreachable (probe err=${probe.err})`
+                        : `unknown (probe status=${probe.status})`
+
+                console.error('⚠️ Anonymous sign-in failed:', cause)
+              } else if (anonData.session && mounted) {
+                console.log('✅ Anonymous sign-in successful:', anonData.session.user.id)
+                // onAuthStateChange(SIGNED_IN) が発火するはずだが、念のためここでもセットアップ
+                await setupSession(anonData.session)
+              }
+            } catch (e: any) {
+              const msg = (e?.message || String(e) || '').toString()
               const probe = await probeAuthSettingsOnce()
               const cause = msg.includes('Invalid API key')
                 ? 'Invalid API key'
                 : msg.includes('Network request failed')
                   ? 'Network request failed'
-                  : (probe.status === 401 || probe.status === 403)
-                    ? `key mismatch (probe status=${probe.status})`
-                    : probe.err
-                      ? `network unreachable (probe err=${probe.err})`
-                      : `unknown (probe status=${probe.status})`
+                  : probe.err
+                    ? `network unreachable (probe err=${probe.err})`
+                    : `probe status=${probe.status}`
 
-              console.error('⚠️ Anonymous sign-in failed:', cause)
-            } else if (anonData.session && mounted) {
-              console.log('✅ Anonymous sign-in successful:', anonData.session.user.id)
-              // onAuthStateChange(SIGNED_IN) が発火するはずだが、念のためここでもセットアップ
-              await setupSession(anonData.session)
+              console.error('⚠️ Anonymous sign-in exception:', cause)
             }
-          } catch (e: any) {
-            const msg = (e?.message || String(e) || '').toString()
-            const probe = await probeAuthSettingsOnce()
-            const cause = msg.includes('Invalid API key')
-              ? 'Invalid API key'
-              : msg.includes('Network request failed')
-                ? 'Network request failed'
-                : probe.err
-                  ? `network unreachable (probe err=${probe.err})`
-                  : `probe status=${probe.status}`
-
-            console.error('⚠️ Anonymous sign-in exception:', cause)
+          } else {
+            console.log('🔐 No initial session found (signed out)')
+            setAuthStatus('signed_out')
+            setAuthMode(null)
           }
         }
 
@@ -464,6 +486,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     profile,
     projectAccess,
     loading,
+    authStatus,
+    authMode,
     signOut,
     refreshProfile,
     refreshProjectAccess,
@@ -491,6 +515,8 @@ export function useAuth() {
       profile: null,
       projectAccess: [],
       loading: true,
+      authStatus: 'preparing',
+      authMode: null,
       signOut: async () => { },
       refreshProfile: async () => { },
       refreshProjectAccess: async () => { },
