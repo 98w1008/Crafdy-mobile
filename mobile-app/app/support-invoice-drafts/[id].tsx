@@ -388,12 +388,12 @@ const styles = StyleSheet.create({
   partyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: Spacing.md,
     marginBottom: Spacing.md,
   },
   partyBlock: {
     flexGrow: 1,
-    minWidth: 220,
+    minWidth: 320,
     backgroundColor: Colors.surfaceGray,
     borderWidth: 1,
     borderColor: Colors.borderLight,

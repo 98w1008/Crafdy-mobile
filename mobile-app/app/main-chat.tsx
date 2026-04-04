@@ -1298,7 +1298,7 @@ const buildFollowupAiReply = (
         '金額はいくら？（内訳があれば内訳も）',
         '支払期日は？',
       ]
-      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n次:\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'estimate': {
       const questions = [
@@ -1307,7 +1307,7 @@ const buildFollowupAiReply = (
         '希望納期は？',
         '現場住所は？（分かる範囲でOK）',
       ]
-      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n次:\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'daily_report': {
       const questions = [
@@ -1315,7 +1315,7 @@ const buildFollowupAiReply = (
         '作業内容は？（箇条書きでOK）',
         '人数/作業時間は？（分かる範囲でOK）',
       ]
-      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n次:\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
     case 'expense': {
       const questions = [
@@ -1324,7 +1324,7 @@ const buildFollowupAiReply = (
         '金額はいくら？（税込）',
         '支払方法は？（現金/カード/振込など）',
       ]
-      return `${progress}\n\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
+      return `${progress}\n\n次:\n👉 ${questions[Math.min(step, questions.length - 1)]}\n${projectNote}`
     }
   }
 }
@@ -2111,7 +2111,7 @@ export default function SimpleChatScreen() {
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `保存しました。[${selectedProject.name}] ${saved.date} の日報です。${demenText ? `\n${demenText}` : ''}${selfStaffText ? `\n${selfStaffText}` : ''}\n次：経費が無ければ「経費なし」。続けて入れるならそのまま経費を送ってOK。\n確認依頼なら「確認依頼」。`,
+            text: `保存しました。[${selectedProject.name}] ${saved.date} の日報です。${demenText ? `\n${demenText}` : ''}${selfStaffText ? `\n${selfStaffText}` : ''}\n\n👉 次：経費が無ければ「経費なし」。続けて入れるならそのまま経費を送ってOK。\n（確認依頼なら「確認依頼」）`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2204,7 +2204,7 @@ export default function SimpleChatScreen() {
 
           const aiMessage: Message = {
             id: (Date.now() + 1).toString(),
-            text: `保存しました。[${selectedProject.name}] ${kindLabel} ¥${saved.amount.toLocaleString('ja-JP')}。\n次：続けて別の経費も入力できます。確認依頼なら「確認依頼」。`,
+            text: `保存しました。[${selectedProject.name}] ${kindLabel} ¥${saved.amount.toLocaleString('ja-JP')}。\n\n👉 次：続けて別の経費も入力できます。\n（確認依頼なら「確認依頼」）`,
             sender: 'ai',
             timestamp: new Date(),
           }
@@ -2957,7 +2957,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'stretch',
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
   emptyHeroCard: {
     backgroundColor: Colors.dark.background.surface,

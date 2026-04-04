@@ -137,11 +137,27 @@ export default function CompanyBillingProfileScreen() {
     }
   }
 
+  const candidateHintFor = (key: keyof FormState): string => {
+    if (!hasTemplateCandidates) return ''
+
+    if (key === 'companyName' && String(companyNameCandidate || '').trim()) return 'テンプレ候補あり（必要なら修正）'
+    if (key === 'logoUri' && String(logoUriCandidate || '').trim()) return 'テンプレ候補あり（必要なら修正）'
+    if (key === 'invoiceRegistrationNumber' && String(invoiceRegistrationNumberCandidate || '').trim()) return 'テンプレ候補あり（必要なら修正）'
+    if (key === 'defaultNote' && String(defaultNoteCandidate || '').trim()) return 'テンプレ候補あり（必要なら修正）'
+
+    return ''
+  }
+
   const renderField = (label: string, key: keyof FormState, props?: { multiline?: boolean }) => {
     const multiline = props?.multiline
+    const candidateHint = candidateHintFor(key)
+
     return (
       <View style={{ gap: 6 }}>
-        <StyledText variant="caption" color="secondary">{label}</StyledText>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+          <StyledText variant="caption" color="secondary">{label}</StyledText>
+          {candidateHint ? <StyledText variant="caption" color="secondary">{candidateHint}</StyledText> : null}
+        </View>
         <TextInput
           value={form[key]}
           onChangeText={v => onChange(key, v)}
