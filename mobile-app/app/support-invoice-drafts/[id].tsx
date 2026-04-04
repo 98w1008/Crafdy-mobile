@@ -8,6 +8,7 @@ import { Colors, Spacing, BorderRadius } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import { listSupportInvoiceDrafts, type SupportInvoiceDraft } from '@/lib/support-invoice-draft-store'
 import { getActiveInvoiceTemplate } from '@/lib/invoice-template-store'
+import { getCompanyBillingProfile, type CompanyBillingProfile } from '@/lib/company-billing-profile-store'
 
 export default function SupportInvoiceDraftPreviewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>()
@@ -17,13 +18,19 @@ export default function SupportInvoiceDraftPreviewScreen() {
   const [templateKey, setTemplateKey] = useState<SupportInvoiceTemplateKey>('standard_simple')
   const [didInitTemplate, setDidInitTemplate] = useState(false)
   const [uploadedActiveNote, setUploadedActiveNote] = useState(false)
+  const [companyProfile, setCompanyProfile] = useState<CompanyBillingProfile | null>(null)
 
   const canSee = access?.kind === 'assigned' && (access.role === 'owner' || access.role === 'office')
 
   const reload = async () => {
-    const [ctx, items] = await Promise.all([getAccessContext(), listSupportInvoiceDrafts()])
+    const [ctx, items, profile] = await Promise.all([
+      getAccessContext(),
+      listSupportInvoiceDrafts(),
+      getCompanyBillingProfile(),
+    ])
     setAccess(ctx)
     setDrafts(items)
+    setCompanyProfile(profile)
   }
 
   const initTemplateFromActive = async () => {
@@ -196,6 +203,32 @@ export default function SupportInvoiceDraftPreviewScreen() {
           </StyledText>
         </View>
 
+        {companyProfile?.companyName || companyProfile?.address || companyProfile?.phone || companyProfile?.invoiceRegistrationNumber ? (
+          <View style={styles.fromBlock}>
+            <StyledText variant="caption" color="secondary">発行元</StyledText>
+            {companyProfile?.companyName ? (
+              <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
+                {companyProfile.companyName}
+              </StyledText>
+            ) : null}
+            {companyProfile?.address ? (
+              <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                {companyProfile.address}
+              </StyledText>
+            ) : null}
+            {companyProfile?.phone ? (
+              <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                TEL: {companyProfile.phone}
+              </StyledText>
+            ) : null}
+            {companyProfile?.invoiceRegistrationNumber ? (
+              <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                登録番号: {companyProfile.invoiceRegistrationNumber}
+              </StyledText>
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={[styles.table, isDetail ? styles.tableDetail : null]}>
           <View style={[styles.tableRow, styles.tableHeaderRow, isDetail ? styles.tableHeaderRowDetail : null]}>
             <StyledText variant="caption" weight="semibold" style={{ flex: 2 }}>
@@ -241,7 +274,14 @@ export default function SupportInvoiceDraftPreviewScreen() {
           </View>
         </View>
 
-        {isDetail ? (
+        {companyProfile?.defaultNote ? (
+          <View style={styles.noteBlock}>
+            <StyledText variant="caption" weight="semibold">備考</StyledText>
+            <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
+              {companyProfile.defaultNote}
+            </StyledText>
+          </View>
+        ) : isDetail ? (
           <View style={styles.noteBlock}>
             <StyledText variant="caption" weight="semibold">備考</StyledText>
             <StyledText variant="caption" color="secondary" style={{ marginTop: 4 }}>
@@ -334,6 +374,12 @@ const styles = StyleSheet.create({
   toBlock: {
     paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
+  },
+  fromBlock: {
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
   },
   toBlockSite: {
     paddingTop: Spacing.md,
