@@ -35,10 +35,18 @@ const emptyForm: FormState = {
 }
 
 export default function CompanyBillingProfileScreen() {
-  const { companyNameCandidate, logoUriCandidate, sourceTemplateName } = useLocalSearchParams<{
+  const {
+    companyNameCandidate,
+    logoUriCandidate,
+    sourceTemplateName,
+    defaultNoteCandidate,
+    invoiceRegistrationNumberCandidate,
+  } = useLocalSearchParams<{
     companyNameCandidate?: string
     logoUriCandidate?: string
     sourceTemplateName?: string
+    defaultNoteCandidate?: string
+    invoiceRegistrationNumberCandidate?: string
   }>()
 
   const [access, setAccess] = useState<AccessContext | null>(null)
@@ -49,6 +57,8 @@ export default function CompanyBillingProfileScreen() {
   const hasTemplateCandidates =
     !!String(companyNameCandidate || '').trim() ||
     !!String(logoUriCandidate || '').trim() ||
+    !!String(defaultNoteCandidate || '').trim() ||
+    !!String(invoiceRegistrationNumberCandidate || '').trim() ||
     !!String(sourceTemplateName || '').trim()
 
   const reload = async () => {
@@ -74,11 +84,15 @@ export default function CompanyBillingProfileScreen() {
     // 候補つきで来た場合は、フォームが空の項目にだけ反映する（既存値は上書きしない）
     const nameC = String(companyNameCandidate || '').trim()
     const logoC = String(logoUriCandidate || '').trim()
+    const noteC = String(defaultNoteCandidate || '').trim()
+    const invoiceRegC = String(invoiceRegistrationNumberCandidate || '').trim()
 
     setForm({
       ...next,
       companyName: next.companyName.trim() ? next.companyName : nameC,
       logoUri: next.logoUri.trim() ? next.logoUri : logoC,
+      defaultNote: next.defaultNote.trim() ? next.defaultNote : noteC,
+      invoiceRegistrationNumber: next.invoiceRegistrationNumber.trim() ? next.invoiceRegistrationNumber : invoiceRegC,
     })
   }
 
@@ -164,6 +178,22 @@ export default function CompanyBillingProfileScreen() {
                 <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
                   テンプレから取り込んだ候補です。必要なら修正して保存してください。
                 </StyledText>
+
+                <View style={{ marginTop: 6, gap: 2 }}>
+                  {String(companyNameCandidate || '').trim() ? (
+                    <StyledText variant="caption" color="secondary">・会社名候補あり</StyledText>
+                  ) : null}
+                  {String(logoUriCandidate || '').trim() ? (
+                    <StyledText variant="caption" color="secondary">・ロゴ候補あり</StyledText>
+                  ) : null}
+                  {String(invoiceRegistrationNumberCandidate || '').trim() ? (
+                    <StyledText variant="caption" color="secondary">・インボイス番号候補あり</StyledText>
+                  ) : null}
+                  {String(defaultNoteCandidate || '').trim() ? (
+                    <StyledText variant="caption" color="secondary">・備考候補あり</StyledText>
+                  ) : null}
+                </View>
+
                 {String(sourceTemplateName || '').trim() ? (
                   <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
                     取り込み元: {String(sourceTemplateName || '').trim()}

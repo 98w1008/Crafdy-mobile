@@ -107,11 +107,21 @@ export default function InvoiceTemplatesScreen() {
     return ''
   }
 
+  const extractInvoiceRegistrationNumberCandidate = (name: string): string => {
+    const trimmed = String(name || '').trim()
+    if (!trimmed) return ''
+
+    // NOTE: 安全側。テンプレ名に明らかに T+13桁 が含まれる場合のみ候補にする。
+    const m = trimmed.match(/T\d{13}/)
+    return m?.[0] || ''
+  }
+
   const handleApplyToCompanyProfile = (t: InvoiceTemplate) => {
     if (t.kind !== 'uploaded') return
 
     const companyNameCandidate = stripExtension(t.name)
     const logoUriCandidate = t.fileType === 'image' ? String(t.sourceUri || '').trim() : ''
+    const invoiceRegistrationNumberCandidate = extractInvoiceRegistrationNumberCandidate(t.name)
 
     router.push({
       pathname: '/company-billing-profile',
@@ -119,6 +129,8 @@ export default function InvoiceTemplatesScreen() {
         companyNameCandidate: companyNameCandidate || undefined,
         logoUriCandidate: logoUriCandidate || undefined,
         sourceTemplateName: String(t.name || '').trim() || undefined,
+        defaultNoteCandidate: undefined,
+        invoiceRegistrationNumberCandidate: invoiceRegistrationNumberCandidate || undefined,
       },
     } as any)
   }
