@@ -190,44 +190,48 @@ export default function SupportInvoiceDraftPreviewScreen() {
             <StyledText variant="heading2" weight="bold">請求書</StyledText>
             <StyledText variant="caption" color="secondary">テンプレ: {templateLabel(templateKey)}</StyledText>
           </View>
-          <StyledText variant="caption" color="secondary">対象月: {draft.ym}</StyledText>
-        </View>
-
-        <View style={[styles.toBlock, isSite ? styles.toBlockSite : null]}>
-          <StyledText variant="caption" color="secondary">請求先</StyledText>
-          <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
-            {draft.companyName}
-          </StyledText>
-          <StyledText variant="caption" color="secondary" numberOfLines={2}>
-            {draft.title}
-          </StyledText>
-        </View>
-
-        {companyProfile?.companyName || companyProfile?.address || companyProfile?.phone || companyProfile?.invoiceRegistrationNumber ? (
-          <View style={styles.fromBlock}>
-            <StyledText variant="caption" color="secondary">発行元</StyledText>
-            {companyProfile?.companyName ? (
-              <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
-                {companyProfile.companyName}
-              </StyledText>
-            ) : null}
-            {companyProfile?.address ? (
-              <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
-                {companyProfile.address}
-              </StyledText>
-            ) : null}
-            {companyProfile?.phone ? (
-              <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
-                TEL: {companyProfile.phone}
-              </StyledText>
-            ) : null}
-            {companyProfile?.invoiceRegistrationNumber ? (
-              <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
-                登録番号: {companyProfile.invoiceRegistrationNumber}
-              </StyledText>
-            ) : null}
+          <View style={styles.ymChip}>
+            <StyledText variant="caption" weight="semibold">対象月: {draft.ym}</StyledText>
           </View>
-        ) : null}
+        </View>
+
+        <View style={styles.partyRow}>
+          <View style={[styles.partyBlock, styles.toBlock, isSite ? styles.toBlockSite : null]}>
+            <StyledText variant="caption" color="secondary">請求先</StyledText>
+            <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
+              {draft.companyName}
+            </StyledText>
+            <StyledText variant="caption" color="secondary" numberOfLines={2}>
+              {draft.title}
+            </StyledText>
+          </View>
+
+          {companyProfile?.companyName || companyProfile?.address || companyProfile?.phone || companyProfile?.invoiceRegistrationNumber ? (
+            <View style={[styles.partyBlock, styles.fromBlock]}>
+              <StyledText variant="caption" color="secondary">発行元</StyledText>
+              {companyProfile?.companyName ? (
+                <StyledText variant="subtitle" weight="semibold" numberOfLines={1}>
+                  {companyProfile.companyName}
+                </StyledText>
+              ) : null}
+              {companyProfile?.address ? (
+                <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                  {companyProfile.address}
+                </StyledText>
+              ) : null}
+              {companyProfile?.phone ? (
+                <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                  TEL: {companyProfile.phone}
+                </StyledText>
+              ) : null}
+              {companyProfile?.invoiceRegistrationNumber ? (
+                <StyledText variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                  登録番号: {companyProfile.invoiceRegistrationNumber}
+                </StyledText>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
 
         <View style={[styles.table, isDetail ? styles.tableDetail : null]}>
           <View style={[styles.tableRow, styles.tableHeaderRow, isDetail ? styles.tableHeaderRowDetail : null]}>
@@ -367,26 +371,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
+    marginBottom: Spacing.md,
+  },
+  ymChip: {
+    backgroundColor: Colors.surfaceGray,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+  },
+
+  partyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  partyBlock: {
+    flexGrow: 1,
+    minWidth: 220,
+    backgroundColor: Colors.surfaceGray,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
   },
   toBlock: {
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
+    // memo: partyBlock と組み合わせて使う
   },
   fromBlock: {
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
+    // memo: partyBlock と組み合わせて使う
   },
   toBlockSite: {
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
     borderLeftWidth: 4,
     borderLeftColor: Colors.primary,
-    paddingLeft: Spacing.md,
   },
 
   table: {
