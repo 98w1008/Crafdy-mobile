@@ -14,6 +14,7 @@ import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
 import { listProjects, StoredProject } from '@/lib/project-store'
 import { getPlanUsageStatus, type PlanUsageStatus } from '@/lib/plan-store'
+import { getBillingState, type BillingState } from '@/lib/billing-store'
 import { approveExpense, listExpenses, StoredExpense } from '@/lib/expense-store'
 import { approveDailyReport, listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
 import { listSupportRates, SupportRate } from '@/lib/support-rate-store'
@@ -79,6 +80,7 @@ export default function DashboardTab() {
   const [memberProjectIds, setMemberProjectIds] = useState<string[] | null>(null)
   const [approvalMode, setApprovalModeState] = useState<ApprovalMode>('owneronly')
   const [planStatus, setPlanStatus] = useState<PlanUsageStatus | null>(null)
+  const [billing, setBilling] = useState<BillingState | null>(null)
 
   const [invoiceSetupCompanyStatus, setInvoiceSetupCompanyStatus] = useState<'unset' | 'set'>('unset')
   const [invoiceSetupTemplateStatus, setInvoiceSetupTemplateStatus] = useState<'unselected' | 'selected'>('unselected')
@@ -97,18 +99,20 @@ export default function DashboardTab() {
 
   const reload = async () => {
     try {
-      const [p, e, r, sr, ps] = await Promise.all([
+      const [p, e, r, sr, ps, b] = await Promise.all([
         listProjects(),
         listExpenses(),
         listDailyReports(),
         listSupportRates(),
         getPlanUsageStatus(),
+        getBillingState(),
       ])
       setProjects(p)
       setExpenses(e)
       setDailyReports(r)
       setSupportRates(sr)
       setPlanStatus(ps)
+      setBilling(b)
     } catch (err) {
       console.error('Failed to load dashboard data', err)
     }
@@ -1309,6 +1313,22 @@ export default function DashboardTab() {
                 現在: {planStatus.currentProjectCount}現場 / 残り: {planStatus.remaining}現場 / 上限: {planStatus.plan.maxActiveProjects}現場
               </StyledText>
             </View>
+
+            {billing ? (
+              <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
+                契約状態: {billing.billingStatus === 'active'
+                  ? '有効'
+                  : billing.billingStatus === 'trial'
+                    ? 'トライアル'
+                    : billing.billingStatus === 'past_due'
+                      ? '支払い未完了'
+                      : billing.billingStatus === 'canceled'
+                        ? '解約'
+                        : billing.billingStatus === 'expired'
+                          ? '期限切れ'
+                          : '未契約'}
+              </StyledText>
+            ) : null}
 
             {planStatus.isOverLimit ? (
               <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
