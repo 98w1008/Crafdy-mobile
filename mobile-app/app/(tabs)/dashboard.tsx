@@ -1300,39 +1300,48 @@ export default function DashboardTab() {
           </StyledText>
         </View>
 
-        {/* プラン状況（表示のみ：まだ止めない） */}
+        {/* 契約/プラン状況（表示のみ：まだ止めない） */}
         {planStatus ? (
           <Card variant="elevated" style={{ padding: Spacing.md, marginBottom: Spacing.md }}>
-            <StyledText variant="subtitle" weight="semibold">プラン状況</StyledText>
+            <StyledText variant="subtitle" weight="semibold">契約・プラン状況</StyledText>
 
             <View style={{ marginTop: 6, gap: 4 }}>
               <StyledText variant="body" weight="semibold">
                 現在プラン: {planStatus.plan.maxActiveProjects}現場プラン
               </StyledText>
+
               <StyledText variant="body" color="secondary">
-                現在: {planStatus.currentProjectCount}現場 / 残り: {planStatus.remaining}現場 / 上限: {planStatus.plan.maxActiveProjects}現場
+                契約状態: {(() => {
+                  const s = billing?.billingStatus
+                  if (s === 'active') return '有効'
+                  if (s === 'trial') return 'トライアル'
+                  if (s === 'past_due') return '支払い未完了'
+                  if (s === 'canceled') return '解約'
+                  if (s === 'expired') return '期限切れ'
+                  return '未契約'
+                })()}
+              </StyledText>
+
+              <StyledText variant="body" color="secondary">
+                現在: {planStatus.currentProjectCount}現場 / 残り: {planStatus.remaining}現場
               </StyledText>
             </View>
 
-            {billing ? (
+            {planStatus.isOverLimit ? (
               <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
-                契約状態: {billing.billingStatus === 'active'
-                  ? '有効'
-                  : billing.billingStatus === 'trial'
-                    ? 'トライアル'
-                    : billing.billingStatus === 'past_due'
-                      ? '支払い未完了'
-                      : billing.billingStatus === 'canceled'
-                        ? '解約'
-                        : billing.billingStatus === 'expired'
-                          ? '期限切れ'
-                          : '未契約'}
+                ※ 上限を超えています（今回は表示のみ）。
               </StyledText>
             ) : null}
 
-            {planStatus.isOverLimit ? (
+            {billing?.billingStatus === 'inactive' ? (
               <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
-                ※ 上限を超えています（今回は表示のみ）。将来の制限連動に備えた注意表示です。
+                ※ 未契約です（今回は表示のみ）。
+              </StyledText>
+            ) : null}
+
+            {billing?.billingStatus === 'past_due' ? (
+              <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
+                ※ 支払い未完了です（今回は表示のみ）。
               </StyledText>
             ) : null}
           </Card>
