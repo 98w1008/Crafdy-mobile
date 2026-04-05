@@ -1387,27 +1387,27 @@ export default function SimpleChatScreen() {
   const emptyQuickActions: EmptyQuickAction[] = [
     {
       id: 'invoice',
-      label: '請求書',
-      hint: '下書き作成・プレビュー',
-      prompt: '請求書を作りたいです。必要な情報を聞いてください。',
+      label: '請求書を作る',
+      hint: '常用/応援 → 下書き作成',
+      prompt: '請求書（常用・応援）の下書きを作りたいです。必要な情報を聞いてください。',
     },
     {
       id: 'estimate',
-      label: '見積',
+      label: '見積を作る',
       hint: '内訳たたき台 → 修正',
       prompt: '見積を作りたいです。必要な情報を聞いてください。',
     },
     {
       id: 'daily_report',
-      label: '日報',
+      label: '日報を入力',
       hint: '今日の作業を整理',
-      prompt: '日報を作りたいです。今日の作業内容を整理したいです。',
+      prompt: '日報を入力したいです。今日の作業内容を整理したいです。',
     },
     {
       id: 'expense',
-      label: '経費',
+      label: '経費を登録',
       hint: '材料費/外注費もOK',
-      prompt: '経費（材料費/外注費含む）を整理したいです。まず何を出せばいいですか？',
+      prompt: '経費（材料費/外注費含む）を登録したいです。まず何を出せばいいですか？',
     },
   ]
 
@@ -2696,19 +2696,19 @@ export default function SimpleChatScreen() {
 
               <View style={styles.menuItems}>
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/(tabs)/dashboard')}>
-                  <Text style={styles.menuItemText}>dashboard</Text>
+                  <Text style={styles.menuItemText}>ダッシュボード</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/project-selector')}>
-                  <Text style={styles.menuItemText}>現場</Text>
+                  <Text style={styles.menuItemText}>現場を選ぶ</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/company-billing-profile')}>
-                  <Text style={styles.menuItemText}>会社情報</Text>
+                  <Text style={styles.menuItemText}>会社情報（請求/見積）</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/invoice-templates')}>
-                  <Text style={styles.menuItemText}>請求書テンプレ</Text>
+                  <Text style={styles.menuItemText}>請求書テンプレート</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/support-invoice-drafts')}>
-                  <Text style={styles.menuItemText}>請求書下書き</Text>
+                  <Text style={styles.menuItemText}>請求書下書き一覧</Text>
                 </TouchableOpacity>
               </View>
 

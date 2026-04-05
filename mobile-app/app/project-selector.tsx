@@ -129,7 +129,13 @@ export default function ProjectSelectorScreen() {
           {loading ? (
             <Text style={styles.muted}>読み込み中…</Text>
           ) : projects.length === 0 ? (
-            <Text style={styles.muted}>まだ現場がありません。下で作成してください。</Text>
+            <Text style={styles.muted}>
+              {canCreateProject
+                ? 'まだ現場がありません。下で作成してください。'
+                : access?.kind === 'assigned' && access.role === 'member'
+                  ? '割り当てられた現場がまだありません。代表に現場の割り当てを依頼してください。'
+                  : '現場がまだありません。'}
+            </Text>
           ) : (
             <View style={styles.list}>
               {projects.map(p => (

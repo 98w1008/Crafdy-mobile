@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, SafeAreaView, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { useFocusEffect, useLocalSearchParams } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
@@ -35,6 +35,7 @@ const emptyForm: FormState = {
 }
 
 export default function CompanyBillingProfileScreen() {
+  const router = useRouter()
   const {
     companyNameCandidate,
     logoUriCandidate,
@@ -181,10 +182,14 @@ export default function CompanyBillingProfileScreen() {
 
         {!canSee ? (
           <Card variant="elevated" style={styles.infoCard}>
-            <StyledText variant="subtitle" weight="semibold">閲覧できません</StyledText>
+            <StyledText variant="subtitle" weight="semibold">この画面は編集権限が必要です</StyledText>
             <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
-              会社情報は owner / office のみ編集できます。
+              会社情報（請求/見積）は owner / office のみ編集できます。
+              職長・従業員の方は、代表に設定を依頼してください。
             </StyledText>
+            <View style={{ marginTop: Spacing.sm }}>
+              <StyledButton title="ダッシュボードへ" variant="secondary" onPress={() => router.replace('/(tabs)/dashboard' as any)} />
+            </View>
           </Card>
         ) : (
           <View style={{ gap: Spacing.md }}>

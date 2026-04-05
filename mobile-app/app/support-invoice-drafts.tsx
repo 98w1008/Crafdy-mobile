@@ -51,10 +51,14 @@ export default function SupportInvoiceDraftsScreen() {
 
         {!canSee ? (
           <Card variant="elevated" style={styles.infoCard}>
-            <StyledText variant="subtitle" weight="semibold">閲覧できません</StyledText>
+            <StyledText variant="subtitle" weight="semibold">この画面は閲覧権限が必要です</StyledText>
             <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
-              請求書下書きは owner / office のみ閲覧できます。
+              請求書下書き（常用・応援）は owner / office のみ確認できます。
+              職長・従業員の方は、代表に「請求書下書きを作成/確認してほしい」と依頼してください。
             </StyledText>
+            <View style={{ marginTop: Spacing.sm }}>
+              <StyledButton title="ダッシュボードへ" variant="secondary" onPress={() => router.replace('/(tabs)/dashboard' as any)} />
+            </View>
           </Card>
         ) : visibleDrafts.length === 0 ? (
           <Card variant="elevated" style={styles.emptyCard}>

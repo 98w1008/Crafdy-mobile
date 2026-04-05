@@ -148,10 +148,14 @@ export default function InvoiceTemplatesScreen() {
 
         {!canSee ? (
           <Card variant="elevated" style={styles.infoCard}>
-            <StyledText variant="subtitle" weight="semibold">閲覧できません</StyledText>
+            <StyledText variant="subtitle" weight="semibold">この画面は閲覧権限が必要です</StyledText>
             <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
-              請求書テンプレは owner / office のみ閲覧できます。
+              請求書テンプレートは owner / office のみ設定できます。
+              職長・従業員の方は、代表にテンプレ設定を依頼してください。
             </StyledText>
+            <View style={{ marginTop: Spacing.sm }}>
+              <StyledButton title="ダッシュボードへ" variant="secondary" onPress={() => router.replace('/(tabs)/dashboard' as any)} />
+            </View>
           </Card>
         ) : (
           <View style={{ gap: Spacing.md }}>
