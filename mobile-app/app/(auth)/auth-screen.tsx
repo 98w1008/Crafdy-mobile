@@ -39,10 +39,15 @@ export default function AuthScreen() {
 
         {/* Auth Buttons Section */}
         <View style={styles.authSection}>
+          <Text style={styles.sectionTitle}>参加方法を選んでください</Text>
+
           <Link href="/(auth)/login" asChild>
             <TouchableOpacity style={[styles.button, styles.loginButton]}>
               <Text style={[styles.buttonText, styles.loginButtonText]}>
-                ログイン
+                既存アカウントでログイン
+              </Text>
+              <Text style={[styles.buttonHint, styles.loginButtonHint]}>
+                すでに作成済みの方
               </Text>
             </TouchableOpacity>
           </Link>
@@ -50,7 +55,21 @@ export default function AuthScreen() {
           <Link href="/(auth)/signup" asChild>
             <TouchableOpacity style={[styles.button, styles.signupButton]}>
               <Text style={[styles.buttonText, styles.signupButtonText]}>
-                新規アカウント作成
+                代表・親方としてはじめる
+              </Text>
+              <Text style={styles.buttonHint}>
+                会社/チームを新しく作成
+              </Text>
+            </TouchableOpacity>
+          </Link>
+
+          <Link href="/join/by-code" asChild>
+            <TouchableOpacity style={[styles.button, styles.codeButton]}>
+              <Text style={[styles.buttonText, styles.codeButtonText]}>
+                招待コードで参加
+              </Text>
+              <Text style={styles.buttonHint}>
+                職長・従業員の方（招待された方）
               </Text>
             </TouchableOpacity>
           </Link>
@@ -144,6 +163,13 @@ const styles = StyleSheet.create({
   authSection: {
     alignItems: 'center',
   },
+  sectionTitle: {
+    width: '100%',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 12,
+  },
   button: {
     width: '100%',
     paddingVertical: 16,
@@ -165,15 +191,31 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#0E73E0',
   },
+  codeButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
   },
+  buttonHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#64748B',
+  },
   loginButtonText: {
     color: '#FFFFFF',
   },
+  loginButtonHint: {
+    color: 'rgba(255,255,255,0.85)',
+  },
   signupButtonText: {
     color: '#0E73E0',
+  },
+  codeButtonText: {
+    color: '#0F172A',
   },
   termsText: {
     fontSize: 12,

@@ -67,7 +67,7 @@ export default function JoinByCodeScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>招待コードで参加</Text>
-          <Text style={styles.headerSubtitle}>代表から共有された招待コードを入力してください。</Text>
+          <Text style={styles.headerSubtitle}>職長・従業員の方は、代表から共有された招待コードを入力してください。</Text>
         </View>
 
         <View style={styles.body}>
@@ -100,6 +100,9 @@ export default function JoinByCodeScreen() {
 
           <Text style={styles.help}>
             ※ 招待コードが無い場合は、代表に発行してもらってください。
+          </Text>
+          <Text style={styles.help}>
+            ※ この参加は「職長・従業員（member）」としての参加を想定しています（現場の閲覧/入力は割当された現場のみ）。
           </Text>
         </View>
       </KeyboardAvoidingView>

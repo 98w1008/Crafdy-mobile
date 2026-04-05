@@ -126,6 +126,11 @@ export const redeemInviteCode = async (
   | { ok: true; membership: Membership }
   | { ok: false; reason: 'invalid' | 'expired' | 'used' | 'revoked' }
 > => {
+  // 招待コードの意味（プロダクト仕様）:
+  // - 代表(owner)が会社/チームの親アカウントを作成
+  // - 職長/従業員(member)が、割当された現場だけを閲覧/入力するための参加入口
+  // - 招待コード参加の成功で unassigned → assigned を成立させ、通常導線（dashboard/main-chat等）に入れる
+  // TODO(課金/プラン): 現場プラン(3/6/9等)に応じて「アカウント人数上限（代表+member）」をここで判定できるようにする
   const normalized = code.trim().toUpperCase()
   if (!normalized) return { ok: false, reason: 'invalid' }
 

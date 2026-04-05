@@ -86,9 +86,15 @@ function AppShell({ loaded }: { loaded: boolean }) {
   // signed_out のときは認証画面へ（本格ログインは次PRで差し込み）
   useEffect(() => {
     if (isAuthRoute) return
+
+    // 招待コード参加（join/by-code）は signed_out でも通す。
+    // - 代表が発行した招待コードで「member/worker」として参加し、unassigned→assigned を成立させる。
+    // TODO: 認証実装が入ったら、join でセッション確立 or ログイン誘導を統合する。
+    if (pathname?.startsWith('/join')) return
+
     if (authStatus !== 'signed_out') return
     router.replace('/(auth)/auth-screen' as any)
-  }, [authStatus, isAuthRoute])
+  }, [authStatus, isAuthRoute, pathname])
 
   // Load Chat-only toggle
   useEffect(() => {
