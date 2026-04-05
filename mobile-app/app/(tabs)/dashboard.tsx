@@ -13,6 +13,7 @@ import { useAuth, useRole } from '@/contexts/AuthContext'
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { StyledText, StyledButton, Card, Icon } from '@/components/ui'
 import { listProjects, StoredProject } from '@/lib/project-store'
+import { getPlanUsageStatus, type PlanUsageStatus } from '@/lib/plan-store'
 import { approveExpense, listExpenses, StoredExpense } from '@/lib/expense-store'
 import { approveDailyReport, listDailyReports, StoredDailyReport } from '@/lib/daily-report-store'
 import { listSupportRates, SupportRate } from '@/lib/support-rate-store'
@@ -77,6 +78,7 @@ export default function DashboardTab() {
   const [access, setAccess] = useState<AccessContext | null>(null)
   const [memberProjectIds, setMemberProjectIds] = useState<string[] | null>(null)
   const [approvalMode, setApprovalModeState] = useState<ApprovalMode>('owneronly')
+  const [planStatus, setPlanStatus] = useState<PlanUsageStatus | null>(null)
 
   const [invoiceSetupCompanyStatus, setInvoiceSetupCompanyStatus] = useState<'unset' | 'set'>('unset')
   const [invoiceSetupTemplateStatus, setInvoiceSetupTemplateStatus] = useState<'unselected' | 'selected'>('unselected')
@@ -95,16 +97,18 @@ export default function DashboardTab() {
 
   const reload = async () => {
     try {
-      const [p, e, r, sr] = await Promise.all([
+      const [p, e, r, sr, ps] = await Promise.all([
         listProjects(),
         listExpenses(),
         listDailyReports(),
         listSupportRates(),
+        getPlanUsageStatus(),
       ])
       setProjects(p)
       setExpenses(e)
       setDailyReports(r)
       setSupportRates(sr)
+      setPlanStatus(ps)
     } catch (err) {
       console.error('Failed to load dashboard data', err)
     }
@@ -1291,6 +1295,21 @@ export default function DashboardTab() {
             プロジェクト全体の管理と統計
           </StyledText>
         </View>
+
+        {/* プラン状況（表示のみ：まだ止めない） */}
+        {planStatus ? (
+          <Card variant="elevated" style={{ padding: Spacing.md, marginBottom: Spacing.md }}>
+            <StyledText variant="subtitle" weight="semibold">プラン状況</StyledText>
+            <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
+              プラン: {planStatus.plan.planKey} / 上限: {planStatus.plan.maxActiveProjects}現場 / 現在: {planStatus.currentProjectCount} / 残り: {planStatus.remaining}
+            </StyledText>
+            {planStatus.isOverLimit ? (
+              <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
+                ※ 上限超過です（今回はブロックしません）。将来の制限連動に備えた表示です。
+              </StyledText>
+            ) : null}
+          </Card>
+        ) : null}
 
         {/* ウェルカムカード */}
         {renderWelcomeCard()}
