@@ -1300,12 +1300,19 @@ export default function DashboardTab() {
         {planStatus ? (
           <Card variant="elevated" style={{ padding: Spacing.md, marginBottom: Spacing.md }}>
             <StyledText variant="subtitle" weight="semibold">プラン状況</StyledText>
-            <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
-              プラン: {planStatus.plan.planKey} / 上限: {planStatus.plan.maxActiveProjects}現場 / 現在: {planStatus.currentProjectCount} / 残り: {planStatus.remaining}
-            </StyledText>
+
+            <View style={{ marginTop: 6, gap: 4 }}>
+              <StyledText variant="body" weight="semibold">
+                現在プラン: {planStatus.plan.maxActiveProjects}現場プラン
+              </StyledText>
+              <StyledText variant="body" color="secondary">
+                現在: {planStatus.currentProjectCount}現場 / 残り: {planStatus.remaining}現場 / 上限: {planStatus.plan.maxActiveProjects}現場
+              </StyledText>
+            </View>
+
             {planStatus.isOverLimit ? (
               <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
-                ※ 上限超過です（今回はブロックしません）。将来の制限連動に備えた表示です。
+                ※ 上限を超えています（今回は表示のみ）。将来の制限連動に備えた注意表示です。
               </StyledText>
             ) : null}
           </Card>
