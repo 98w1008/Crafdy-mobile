@@ -1325,6 +1325,20 @@ export default function DashboardTab() {
               <StyledText variant="body" color="secondary">
                 現在: {planStatus.currentProjectCount}現場 / 残り: {planStatus.remaining}現場
               </StyledText>
+
+              <View style={{ marginTop: 6 }}>
+                <StyledButton
+                  title={(() => {
+                    const s = billing?.billingStatus
+                    if (s === 'past_due') return '支払いを更新'
+                    if (s === 'canceled') return '再開する'
+                    if (s === 'inactive' || s === 'expired') return 'プランを開始'
+                    return '契約・プランを管理'
+                  })()}
+                  variant="secondary"
+                  onPress={() => router.push('/billing' as any)}
+                />
+              </View>
             </View>
 
             {planStatus.isOverLimit ? (
