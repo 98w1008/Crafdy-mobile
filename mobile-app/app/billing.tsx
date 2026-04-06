@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getBillingState, type BillingState } from '@/lib/billing-store'
@@ -24,8 +24,14 @@ const ctaLabel = (s: BillingState['billingStatus']) => {
 
 export default function BillingScreen() {
   const router = useRouter()
+  const { returnTo, result } = useLocalSearchParams<{ returnTo?: string; result?: string }>()
   const [billing, setBilling] = useState<BillingState | null>(null)
   const [planMax, setPlanMax] = useState<number | null>(null)
+
+  const backTo = useMemo(() => {
+    const v = String(returnTo || '').trim()
+    return v ? v : '/(tabs)/dashboard'
+  }, [returnTo])
 
   const reload = async () => {
     const [b, p] = await Promise.all([getBillingState(), getCompanyPlan()])
@@ -38,6 +44,21 @@ export default function BillingScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // checkout から戻ってきた時の想定（success / cancel）
+  useEffect(() => {
+    if (!result) return
+
+    if (result === 'success') {
+      // TODO(Stripe): checkout成功後に、サーバ側で subscription を確定
+      // TODO(Stripe): ここで billingState を refresh（API経由で取得→setBillingState）
+      Alert.alert('手続きが完了しました', '契約状態の反映は準備中です（次PRで対応予定）。')
+    }
+
+    if (result === 'cancel') {
+      Alert.alert('キャンセルしました', '契約手続きはキャンセルされました。')
+    }
+  }, [result])
+
   useFocusEffect(
     React.useCallback(() => {
       reload()
@@ -45,8 +66,14 @@ export default function BillingScreen() {
   )
 
   const handleCTA = () => {
-    // NOTE: PR64は導線の土台のみ（Stripe checkout は次PR以降）
-    // TODO(Stripe): ここで checkout session を作成 → 成功/キャンセルで戻る → billingState を更新
+    // NOTE(PR65): ここは checkout 実装の差し込み口。
+    // TODO(Stripe): create checkout session here
+    //   - input: planKey, customerId(or auth userId), successUrl, cancelUrl
+    //   - successUrl: /billing?result=success&returnTo=<backTo>
+    //   - cancelUrl : /billing?result=cancel&returnTo=<backTo>
+    // TODO(Stripe): open Stripe Checkout (web)
+    // TODO(Stripe): on return (success): refresh billingState (API fetch) and re-render
+    // TODO(Stripe): on return (cancel): no state update
     Alert.alert('準備中', '決済（Stripe checkout）は次PRで差し込み予定です。')
   }
 
@@ -75,7 +102,7 @@ export default function BillingScreen() {
               variant="primary"
               onPress={handleCTA}
             />
-            <StyledButton title="ダッシュボードへ戻る" variant="secondary" onPress={() => router.replace('/(tabs)/dashboard' as any)} />
+            <StyledButton title="戻る" variant="secondary" onPress={() => router.replace(backTo as any)} />
           </View>
         </Card>
       </ScrollView>
