@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking'
 import * as WebBrowser from 'expo-web-browser'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
-import { getBillingState, type BillingState } from '@/lib/billing-store'
+import { getBillingState, setBillingState, type BillingState } from '@/lib/billing-store'
 import { getCompanyPlan } from '@/lib/plan-store'
 import { supabase, supabaseReady } from '@/lib/supabase'
 
@@ -30,6 +30,7 @@ export default function BillingScreen() {
   const { returnTo, result } = useLocalSearchParams<{ returnTo?: string; result?: string }>()
   const [billing, setBilling] = useState<BillingState | null>(null)
   const [planMax, setPlanMax] = useState<number | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const backTo = useMemo(() => {
     const v = String(returnTo || '').trim()
@@ -52,9 +53,42 @@ export default function BillingScreen() {
     if (!result) return
 
     if (result === 'success') {
-      // TODO(Stripe): checkout成功後に、サーバ側で subscription を確定
-      // TODO(Stripe): ここで billingState を refresh（API経由で取得→setBillingState）
-      Alert.alert('手続きが完了しました', '契約状態の反映は準備中です（次PRで対応予定）。')
+      // NOTE: 本来は webhook で billingState を確定更新する。
+      // このPRでは「成功後に再取得して反映する」最小導線だけ入れる。
+      ;(async () => {
+        if (!supabaseReady || !supabase) {
+          Alert.alert('手続きが完了しました', '契約状態の反映は準備中です。')
+          return
+        }
+
+        try {
+          setIsRefreshing(true)
+          const { data, error } = await supabase.functions.invoke('billing-refresh', { body: {} })
+          if (error) {
+            console.warn('billing-refresh failed', error)
+            Alert.alert('手続きが完了しました', '契約状態の確認に失敗しました。時間をおいて再度お試しください。')
+            return
+          }
+
+          const next = data as any
+          if (next?.billingStatus && next?.planKey) {
+            await setBillingState({
+              planKey: String(next.planKey),
+              billingStatus: String(next.billingStatus),
+              currentPeriodEnd: next.currentPeriodEnd ? String(next.currentPeriodEnd) : undefined,
+              cancelAtPeriodEnd: typeof next.cancelAtPeriodEnd === 'boolean' ? next.cancelAtPeriodEnd : undefined,
+            } as any)
+          }
+
+          await reload()
+          Alert.alert('手続きが完了しました', '契約状態を更新しました（反映まで時間がかかる場合があります）。')
+        } catch (e) {
+          console.error('billing refresh error', e)
+          Alert.alert('手続きが完了しました', '契約状態の確認に失敗しました。')
+        } finally {
+          setIsRefreshing(false)
+        }
+      })()
     }
 
     if (result === 'cancel') {
@@ -135,6 +169,11 @@ export default function BillingScreen() {
           <StyledText variant="body" color="secondary" style={{ marginTop: 6 }}>
             契約状態: {billing ? statusLabel(billing.billingStatus) : '読み込み中…'}
           </StyledText>
+          {isRefreshing ? (
+            <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
+              契約状態を確認中…
+            </StyledText>
+          ) : null}
           <StyledText variant="body" color="secondary" style={{ marginTop: 2 }}>
             現在プラン: {planMax ? `${planMax}現場プラン` : '読み込み中…'}
           </StyledText>
