@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import * as Linking from 'expo-linking'
+import * as WebBrowser from 'expo-web-browser'
 import { Card, StyledButton, StyledText } from '@/components/ui'
 import { Colors, Spacing } from '@/constants/Colors'
 import { getBillingState, type BillingState } from '@/lib/billing-store'
 import { getCompanyPlan } from '@/lib/plan-store'
+import { supabase, supabaseReady } from '@/lib/supabase'
 
 const statusLabel = (s: BillingState['billingStatus']) => {
   if (s === 'active') return '有効'
@@ -65,29 +68,56 @@ export default function BillingScreen() {
     }, [])
   )
 
-  const handleCTA = () => {
-    // NOTE(PR66): 最小接続
-    // - 本来はここで checkout session を作成して Stripe Checkout を開く
-    // - 今回は「開始 → success/cancel で戻る」だけを先に通す
-    // TODO(Stripe): create checkout session here
-    //   - input: planKey, customerId(or auth userId), successUrl, cancelUrl
-    //   - successUrl: /billing?result=success&returnTo=<backTo>
-    //   - cancelUrl : /billing?result=cancel&returnTo=<backTo>
-    // TODO(Stripe): open Stripe Checkout (web)
-    // TODO(Stripe): on return (success): refresh billingState (API fetch) and re-render
-    // TODO(Stripe): on return (cancel): no state update
+  const handleCTA = async () => {
+    // NOTE(PR67): Stripe checkout 本接続（最小）
+    // - Edge Functionで checkout session を作成 → checkout URL を受け取って開く
+    // - success/cancel は deep link で /billing に戻す（result/returnTo を維持）
+    // TODO(Stripe): success 後に billingState refresh を差し込む（API fetch）
 
-    Alert.alert('決済を開始', '（最小接続）戻りの動作だけ先に確認できます。', [
-      {
-        text: 'キャンセルとして戻る',
-        style: 'cancel',
-        onPress: () => router.replace({ pathname: '/billing', params: { result: 'cancel', returnTo: backTo } } as any),
-      },
-      {
-        text: '成功として戻る',
-        onPress: () => router.replace({ pathname: '/billing', params: { result: 'success', returnTo: backTo } } as any),
-      },
-    ])
+    if (!supabaseReady || !supabase) {
+      Alert.alert('準備中', '環境設定（Supabase）が未完了です。')
+      return
+    }
+
+    const planKey = (billing?.planKey || 'projects_3') as any
+
+    const successUrl = Linking.createURL('/billing', {
+      queryParams: { result: 'success', returnTo: backTo },
+    })
+
+    const cancelUrl = Linking.createURL('/billing', {
+      queryParams: { result: 'cancel', returnTo: backTo },
+    })
+
+    try {
+      const { data, error } = await supabase.functions.invoke('billing-checkout', {
+        body: {
+          planKey,
+          successUrl,
+          cancelUrl,
+        },
+      })
+
+      const checkoutUrl = String((data as any)?.url || '').trim()
+      if (error || !checkoutUrl) {
+        console.warn('Failed to create checkout session', error)
+        Alert.alert('エラー', '決済の開始に失敗しました。時間をおいて再度お試しください。')
+        return
+      }
+
+      // openAuthSessionAsync: success/cancel の deep link を捕捉してアプリに戻す
+      const res = await WebBrowser.openAuthSessionAsync(checkoutUrl, successUrl)
+
+      if (res.type === 'success' && res.url) {
+        // deep link で戻ってきたURLを明示的に反映（環境によっては自動遷移しないため）
+        router.replace(res.url as any)
+      } else if (res.type === 'cancel') {
+        // 何もしない（ユーザーがブラウザを閉じた）
+      }
+    } catch (e) {
+      console.error('checkout start error', e)
+      Alert.alert('エラー', '決済の開始に失敗しました。')
+    }
   }
 
   return (
