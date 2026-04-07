@@ -66,7 +66,9 @@ export default function BillingScreen() {
   )
 
   const handleCTA = () => {
-    // NOTE(PR65): ここは checkout 実装の差し込み口。
+    // NOTE(PR66): 最小接続
+    // - 本来はここで checkout session を作成して Stripe Checkout を開く
+    // - 今回は「開始 → success/cancel で戻る」だけを先に通す
     // TODO(Stripe): create checkout session here
     //   - input: planKey, customerId(or auth userId), successUrl, cancelUrl
     //   - successUrl: /billing?result=success&returnTo=<backTo>
@@ -74,7 +76,18 @@ export default function BillingScreen() {
     // TODO(Stripe): open Stripe Checkout (web)
     // TODO(Stripe): on return (success): refresh billingState (API fetch) and re-render
     // TODO(Stripe): on return (cancel): no state update
-    Alert.alert('準備中', '決済（Stripe checkout）は次PRで差し込み予定です。')
+
+    Alert.alert('決済を開始', '（最小接続）戻りの動作だけ先に確認できます。', [
+      {
+        text: 'キャンセルとして戻る',
+        style: 'cancel',
+        onPress: () => router.replace({ pathname: '/billing', params: { result: 'cancel', returnTo: backTo } } as any),
+      },
+      {
+        text: '成功として戻る',
+        onPress: () => router.replace({ pathname: '/billing', params: { result: 'success', returnTo: backTo } } as any),
+      },
+    ])
   }
 
   return (
