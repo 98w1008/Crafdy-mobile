@@ -58,6 +58,20 @@ Deno.serve(async req => {
     const userId = userRes?.user?.id
     if (userErr || !userId) return json(401, { error: 'Unauthorized' })
 
+    // NOTE(PR69): まず webhook が保存した billingStateV1（本筋）を参照する。
+    // 無ければ Stripe へ直接問い合わせ（暫定fallback）する。
+    const meta = (userRes?.user?.user_metadata || {}) as any
+    const saved = meta?.billingStateV1
+    if (saved?.planKey && saved?.billingStatus) {
+      const out: RespBody = {
+        planKey: String(saved.planKey) as any,
+        billingStatus: String(saved.billingStatus) as any,
+        currentPeriodEnd: saved.currentPeriodEnd ? String(saved.currentPeriodEnd) : undefined,
+        cancelAtPeriodEnd: typeof saved.cancelAtPeriodEnd === 'boolean' ? saved.cancelAtPeriodEnd : undefined,
+      }
+      return json(200, out)
+    }
+
     const stripe = new Stripe(secretKey, { apiVersion: '2023-10-16' })
 
     // Find most recent completed checkout session for this user.

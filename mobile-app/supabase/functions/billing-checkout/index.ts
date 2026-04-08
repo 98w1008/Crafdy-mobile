@@ -75,6 +75,13 @@ Deno.serve(async req => {
         planKey,
         userId,
       },
+      // NOTE(PR69): subscriptionイベントでも userId/planKey を拾えるようにする（webhook同期の土台）
+      subscription_data: {
+        metadata: {
+          planKey,
+          userId,
+        },
+      },
     })
 
     return json(200, { url: session.url })
