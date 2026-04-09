@@ -110,8 +110,7 @@ export default function SignupScreen() {
 
       // メール確認がOFFの環境では、そのまま signed_in になれる
       if (data?.session) {
-        const to = String(returnTo || '').trim() || '/main-chat'
-        router.replace(to as any)
+        router.replace({ pathname: '/owner-setup', params: { returnTo: String(returnTo || '') } } as any)
         return
       }
 
