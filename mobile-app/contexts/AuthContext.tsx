@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js'
 import { supabase, supabaseReady, probeAuthSettingsOnce } from '@/lib/supabase'
 import { loadDemoFlag } from '@/lib/api'
 import { setAccessToken as setStoredAccessToken } from '@/lib/token-store'
+import { getMyMembership, setMyMembership } from '@/lib/membership-store'
 
 type UserRole = 'parent' | 'lead' | 'worker'
 
@@ -105,7 +106,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const ensureProfile = async (userId: string, email?: string) => {
+  const ensureProfile = async (userId: string, email?: string, userMeta?: any) => {
     if (!supabase) return
     const { data } = await supabase
       .from('user_profiles')
@@ -114,10 +115,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       .maybeSingle()
 
     if (!data) {
+      const roleFromMeta = String(userMeta?.role || '').trim()
+      const role: UserRole = (roleFromMeta === 'parent' || roleFromMeta === 'lead' || roleFromMeta === 'worker')
+        ? (roleFromMeta as UserRole)
+        : 'worker'
+
+      const displayName = String(userMeta?.full_name || '').trim() || (email || '').split('@')[0]
+      const company = String(userMeta?.company || '').trim() || null
+
       await supabase.from('user_profiles').insert({
         user_id: userId,
-        display_name: (email || '').split('@')[0],
-        role: 'worker'
+        display_name: displayName,
+        company,
+        role,
       })
     }
   }
@@ -307,7 +317,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setAuthMode(currentSession.user?.is_anonymous ? 'anonymous' : 'authenticated')
 
       try {
-        await ensureProfile(currentSession.user.id, currentSession.user.email)
+        // NOTE(PR72): owner(parent) signup 直後に role/company が揃っていないと、owner前提の画面が「閲覧不可」になりやすい。
+        // - Supabase Auth user_metadata を優先して user_profiles を初期化する。
+        await ensureProfile(currentSession.user.id, currentSession.user.email, (currentSession.user as any)?.user_metadata)
+
+        // NOTE(PR72): owner(parent) は最小実装として local membership を seeded する。
+        // - invite code 参加（member/office）の local membership は上書きしない。
+        const metaRole = String((currentSession.user as any)?.user_metadata?.role || '').trim()
+        const existingMembership = await getMyMembership()
+        if (!existingMembership && metaRole === 'parent') {
+          const nowIso = new Date().toISOString()
+          await setMyMembership({
+            id: `membership-${Date.now()}`,
+            companyId: String((currentSession.user as any)?.id || ''),
+            userId: String((currentSession.user as any)?.id || ''),
+            role: 'owner',
+            status: 'active',
+            createdAt: nowIso,
+          })
+        }
 
         // プロフィール取得
         const userProfile = await fetchUserProfile(currentSession.user.id)
