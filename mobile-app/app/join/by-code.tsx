@@ -45,8 +45,8 @@ export default function JoinByCodeScreen() {
       const res = await redeemInviteCode(trimmed)
       if (res.ok) {
         setStatus('success')
-        setMessage('参加しました。続けて現場を選んでください。')
-        router.replace('/project-selector')
+        setMessage('参加しました。次に、担当の現場を確認してください。')
+        router.replace('/member-setup')
         return
       }
 
