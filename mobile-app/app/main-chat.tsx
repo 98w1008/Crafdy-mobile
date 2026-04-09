@@ -13,6 +13,7 @@ import {
   Pressable,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import { getAccessContext, type AccessContext } from '@/lib/access-context'
 
 // NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
 const ASK_NEXT_PLAN_IN_MVP = false
@@ -1349,6 +1350,8 @@ export default function SimpleChatScreen() {
   const [selectedProject, setSelectedProjectState] = useState<SelectedProject>(null)
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<{ address?: string; memo?: string; revenue?: number } | null>(null)
 
+  const [access, setAccess] = useState<AccessContext | null>(null)
+
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
   const [expenseCollected, setExpenseCollected] = useState<ExpenseCollected>(defaultExpenseCollected)
@@ -1384,6 +1387,45 @@ export default function SimpleChatScreen() {
     selectedProjectName?: string
   }>()
 
+  const promptChips = (() => {
+    const role = access?.kind === 'assigned' ? access.role : 'unassigned'
+
+    if (role === 'owner' || role === 'office') {
+      return [
+        { id: 'what', label: '何ができる？', text: 'クラフディで何ができますか？' },
+        { id: 'setup', label: '最初に設定は？', text: '最初に何を設定すればいいですか？' },
+        { id: 'report', label: '日報を入力', text: '日報を入力したいです。必要な情報を聞いてください。' },
+        { id: 'expense', label: '経費を登録', text: '経費を登録したいです。必要な情報を聞いてください。' },
+        { id: 'invoice', label: '請求書を作る', text: '請求書を作りたいです。必要な情報を聞いてください。' },
+      ]
+    }
+
+    if (role === 'member') {
+      return [
+        { id: 'what', label: '何ができる？', text: '職長・従業員として、何ができますか？' },
+        { id: 'project', label: '担当現場を確認', text: '担当の現場を確認したいです。' },
+        { id: 'report', label: '日報を書く', text: '日報を入力したいです。必要な情報を聞いてください。' },
+        { id: 'expense', label: '経費を入れる', text: '経費を登録したいです。必要な情報を聞いてください。' },
+      ]
+    }
+
+    return [
+      { id: 'what', label: '何ができる？', text: 'クラフディで何ができますか？' },
+      { id: 'setup', label: '最初に設定は？', text: '最初に何を設定すればいいですか？' },
+      { id: 'report', label: '日報を入力', text: '日報を入力したいです。必要な情報を聞いてください。' },
+      { id: 'expense', label: '経費を登録', text: '経費を登録したいです。必要な情報を聞いてください。' },
+    ]
+  })()
+
+  const handleChipPress = (text: string) => {
+    setInputText(text)
+    setTimeout(() => {
+      try {
+        inputRef.current?.focus()
+      } catch {}
+    }, 0)
+  }
+
   const emptyQuickActions: EmptyQuickAction[] = [
     {
       id: 'invoice',
@@ -1415,6 +1457,17 @@ export default function SimpleChatScreen() {
     setSelectedProjectState(project)
     await setSelectedProject(project)
   }
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const ctx = await getAccessContext()
+        setAccess(ctx)
+      } catch {
+        // ignore
+      }
+    })()
+  }, [])
 
   // 保存済みの現場を復元（初回起動/復帰用）
   useEffect(() => {
@@ -2776,27 +2829,47 @@ export default function SimpleChatScreen() {
 
         {/* 入力欄（常に有効） */}
         <View style={styles.inputContainer}>
-          <TextInput
-            ref={(r) => { inputRef.current = r }}
-            style={styles.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder={
-              selectedProject
-                ? '例）この現場の見積を作って / 日報つけたい'
-                : '例）請求書作って / 経費12000円 / 現場はあとでOK'
-            }
-            placeholderTextColor={Colors.dark.text.tertiary}
-            multiline
-            maxLength={1000}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-            onPress={handleSend}
-            disabled={!canSend}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.sendButtonText}>送信</Text>
-          </TouchableOpacity>
+            {promptChips.map(chip => (
+              <TouchableOpacity
+                key={chip.id}
+                style={styles.chip}
+                onPress={() => handleChipPress(chip.text)}
+                accessibilityLabel={`プロンプト: ${chip.label}`}
+              >
+                <Text style={styles.chipText} numberOfLines={1}>{chip.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <View style={styles.inputRow}>
+            <TextInput
+              ref={(r) => { inputRef.current = r }}
+              style={styles.input}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder={
+                selectedProject
+                  ? '例）この現場の見積を作って / 日報つけたい'
+                  : '例）請求書作って / 経費12000円 / 現場はあとでOK'
+              }
+              placeholderTextColor={Colors.dark.text.tertiary}
+              multiline
+              maxLength={1000}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+              onPress={handleSend}
+              disabled={!canSend}
+            >
+              <Text style={styles.sendButtonText}>送信</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
       </KeyboardAvoidingView>
@@ -3106,11 +3179,31 @@ const styles = StyleSheet.create({
     lineHeight: Typography.lineHeights.tight * Typography.sizes.xs,
   },
   inputContainer: {
-    flexDirection: 'row',
     padding: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.dark.border.light,
     backgroundColor: Colors.dark.background.primary,
+    gap: Spacing.sm,
+  },
+  chipsRow: {
+    paddingRight: 6,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.dark.background.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+  },
+  chipText: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+  },
+  inputRow: {
+    flexDirection: 'row',
     gap: Spacing.sm,
     alignItems: 'flex-end',
   },
