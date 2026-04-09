@@ -1,9 +1,18 @@
 import React, { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native'
 import { supabase, supabaseReady } from '@/lib/supabase'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
+
+const toAuthErrorText = (raw: string) => {
+  const msg = String(raw || '').toLowerCase()
+  if (msg.includes('invalid login credentials')) return 'メールアドレスまたはパスワードを確認してください'
+  if (msg.includes('email')) return 'メールアドレスを確認してください'
+  if (msg.includes('password')) return 'パスワードを確認してください'
+  return 'ログインに失敗しました'
+}
 
 export default function LoginScreen() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,9 +39,10 @@ export default function LoginScreen() {
       })
 
       if (error) {
-        Alert.alert('ログインエラー', error.message)
+        Alert.alert('ログインできません', toAuthErrorText(error.message))
       } else {
-        router.replace('/main-chat')
+        const to = String(returnTo || '').trim() || '/main-chat'
+        router.replace(to as any)
       }
     } catch (error) {
       Alert.alert('エラー', 'ログインに失敗しました')

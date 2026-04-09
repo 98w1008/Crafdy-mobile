@@ -10,14 +10,23 @@ import {
   SafeAreaView 
 } from 'react-native'
 import { supabase, supabaseReady } from '@/lib/supabase'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import * as Haptics from 'expo-haptics'
 
 const theme = Colors.light
 const accent = Colors.accent
 
+const toSignupErrorText = (raw: string) => {
+  const msg = String(raw || '').toLowerCase()
+  if (msg.includes('already registered') || msg.includes('user already registered')) return 'このメールアドレスは既に使われています'
+  if (msg.includes('email')) return 'メールアドレスを確認してください'
+  if (msg.includes('password')) return 'パスワードを確認してください'
+  return 'アカウント作成に失敗しました'
+}
+
 export default function SignupScreen() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>()
   const [fullName, setFullName] = useState('')
   const [company, setCompany] = useState('')
   // 代表・親方アカウント専用（roleは固定）
@@ -95,19 +104,26 @@ export default function SignupScreen() {
 
       if (error) {
         console.error('Signup error:', error)
-        Alert.alert('登録エラー', error.message)
+        Alert.alert('作成できません', toSignupErrorText(error.message))
+        return
+      }
+
+      // メール確認がOFFの環境では、そのまま signed_in になれる
+      if (data?.session) {
+        const to = String(returnTo || '').trim() || '/main-chat'
+        router.replace(to as any)
         return
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       Alert.alert(
-        'アカウント作成完了',
-        'メールアドレスに確認メールを送信しました。メール内のリンクをクリックしてアカウントを有効化してからログインしてください。',
+        'アカウントを作成しました',
+        '確認メールを送信しました。メール内のリンクを開いてからログインしてください。',
         [
-          { 
-            text: 'ログイン画面へ', 
-            onPress: () => router.replace('/(auth)/login') 
-          }
+          {
+            text: 'ログインへ',
+            onPress: () => router.replace({ pathname: '/(auth)/login', params: { returnTo: String(returnTo || '') } } as any),
+          },
         ]
       )
     } catch (error) {
