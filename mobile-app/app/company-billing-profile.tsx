@@ -42,12 +42,14 @@ export default function CompanyBillingProfileScreen() {
     sourceTemplateName,
     defaultNoteCandidate,
     invoiceRegistrationNumberCandidate,
+    returnTo,
   } = useLocalSearchParams<{
     companyNameCandidate?: string
     logoUriCandidate?: string
     sourceTemplateName?: string
     defaultNoteCandidate?: string
     invoiceRegistrationNumberCandidate?: string
+    returnTo?: string
   }>()
 
   const [access, setAccess] = useState<AccessContext | null>(null)
@@ -130,8 +132,17 @@ export default function CompanyBillingProfileScreen() {
         defaultNote: form.defaultNote,
       })
 
-      Alert.alert('保存しました')
       await reload()
+
+      const backTo = String(returnTo || '').trim()
+      if (backTo) {
+        Alert.alert('保存しました', '次は現場を作る / 選ぶへ進むとスムーズです。', [
+          { text: 'あとで', style: 'cancel' },
+          { text: '現場を作る / 選ぶ', onPress: () => router.push({ pathname: '/project-selector', params: { returnTo: backTo } } as any) },
+        ])
+      } else {
+        Alert.alert('保存しました')
+      }
     } catch (e) {
       console.error('Failed to save company billing profile', e)
       Alert.alert('保存に失敗しました')

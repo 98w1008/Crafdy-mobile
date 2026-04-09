@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import { createProject, listProjects, setSelectedProject, StoredProject } from '@/lib/project-store'
@@ -20,6 +20,7 @@ import { listProjectIdsForMember } from '@/lib/project-membership-store'
 
 export default function ProjectSelectorScreen() {
   const router = useRouter()
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>()
 
   const [projects, setProjects] = useState<StoredProject[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,6 +72,11 @@ export default function ProjectSelectorScreen() {
     })
   }
 
+  const backTo = () => {
+    const to = String(returnTo || '').trim()
+    router.replace((to || '/main-chat') as any)
+  }
+
   const backToMainChatCreated = (p: Pick<StoredProject, 'id' | 'name'>) => {
     router.replace({
       pathname: '/main-chat',
@@ -111,7 +117,7 @@ export default function ProjectSelectorScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.replace('/main-chat')}
+            onPress={backTo}
             accessibilityLabel="戻る"
           >
             <Text style={styles.backButtonText}>←</Text>

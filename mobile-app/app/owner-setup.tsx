@@ -33,13 +33,13 @@ export default function OwnerSetupScreen() {
         <View style={{ marginTop: Spacing.lg }}>
           <StyledButton
             label="会社情報を設定"
-            onPress={() => router.push('/company-billing-profile' as any)}
+            onPress={() => router.push({ pathname: '/company-billing-profile', params: { returnTo: '/owner-setup' } } as any)}
           />
           <View style={{ height: 10 }} />
           <StyledButton
             variant="secondary"
             label="現場を作る / 選ぶ"
-            onPress={() => router.push('/project-selector' as any)}
+            onPress={() => router.push({ pathname: '/project-selector', params: { returnTo: '/owner-setup' } } as any)}
           />
           <View style={{ height: 10 }} />
           <StyledButton
