@@ -2858,12 +2858,13 @@ export default function SimpleChatScreen() {
           {isEmpty ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyHeroCard}>
-                <Text style={styles.emptyStateText}>今日なにをしますか？</Text>
+                <Text style={styles.emptyStateText}>チャットで何をしますか？</Text>
                 <Text style={styles.emptyStateSubtext}>
-                  請求書・見積・日報・経費を、チャットで作れます。{'\n'}
-                  現場はあとから選べます（右上「現場」）。
+                  まずは下のボタンから始めるのがおすすめです。
                 </Text>
-                <Text style={styles.emptyStateHint}>ボタンを押すか、下で自由に入力してください。</Text>
+                <Text style={styles.emptyStateHint}>
+                  迷ったら chips（例:「何ができる？」）を押すと、使い方を案内します。
+                </Text>
 
                 <View style={styles.emptyQuickActionsRow}>
                   {emptyQuickActions.map(action => (
@@ -2928,8 +2929,8 @@ export default function SimpleChatScreen() {
               onChangeText={setInputText}
               placeholder={
                 selectedProject
-                  ? '例）この現場の見積を作って / 日報つけたい'
-                  : '例）請求書作って / 経費12000円 / 現場はあとでOK'
+                  ? '例）日報を入力したい / 経費12000円'
+                  : '例）日報を入力したい / 経費12000円 / 現場はあとでOK'
               }
               placeholderTextColor={Colors.dark.text.tertiary}
               multiline
