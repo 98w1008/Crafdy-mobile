@@ -14,7 +14,7 @@ export default function MemberSetupScreen() {
         <View style={styles.header}>
           <StyledText variant="title" weight="bold">参加できました</StyledText>
           <StyledText variant="body" color="secondary" style={{ marginTop: 8 }}>
-            まずは担当の現場を確認して、main-chat から日報・経費を入力します。
+            まずは担当の現場を確認して、main-chat で日報・経費を入力します。
           </StyledText>
         </View>
 
@@ -43,6 +43,9 @@ export default function MemberSetupScreen() {
         <View style={{ marginTop: Spacing.lg }}>
           <StyledText variant="caption" color="secondary">
             ※ 会社情報・請求書テンプレなどの設定は代表向けです。
+          </StyledText>
+          <StyledText variant="caption" color="secondary" style={{ marginTop: 6 }}>
+            日報・経費はあなたが入力できます。
           </StyledText>
         </View>
       </ScrollView>

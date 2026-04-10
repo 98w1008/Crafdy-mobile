@@ -17,7 +17,7 @@ export default function OwnerSetupScreen() {
         <View style={styles.header}>
           <StyledText variant="title" weight="bold">はじめにやること</StyledText>
           <StyledText variant="body" color="secondary" style={{ marginTop: 8 }}>
-            代表・親方として、まずはこの順で進めるとスムーズです。
+            まずはこの3つを済ませると、すぐ使い始められます。
           </StyledText>
         </View>
 
@@ -44,7 +44,7 @@ export default function OwnerSetupScreen() {
           <View style={{ height: 10 }} />
           <StyledButton
             variant="ghost"
-            label="main-chat を使い始める"
+            label="main-chat を開く"
             onPress={() => router.replace(toMain as any)}
           />
         </View>
