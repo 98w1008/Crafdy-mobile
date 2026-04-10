@@ -1589,6 +1589,79 @@ export default function SimpleChatScreen() {
       return
     }
 
+    const guideReply = (() => {
+      const role = access?.kind === 'assigned' ? access.role : 'unassigned'
+
+      const isWhat = /(何ができる|できること|使い方)/.test(trimmed)
+      const isSetup = /(最初に.*設定|初期.*設定|最初に何を|何から始める)/.test(trimmed)
+      const isProjectCheck = /(担当.*現場|現場.*確認|現場を確認)/.test(trimmed)
+
+      if (isWhat) {
+        if (role === 'member') {
+          return [
+            'クラフディ（職長・従業員）でできることは主に3つです。',
+            '1. 日報を書く',
+            '2. 経費を入れる',
+            '3. 担当現場の履歴を見る',
+            '',
+            '次は「日報を入力したい」または「経費を登録したい」と送ってください。',
+          ].join('\n')
+        }
+
+        return [
+          'クラフディでできることは主に4つです。',
+          '1. 日報を入力',
+          '2. 経費を登録',
+          '3. 見積を作る',
+          '4. 請求書（常用・応援）の下書きを作る',
+          '',
+          '次は「現場を作りたい」または「日報を入力したい」と送ってください。',
+        ].join('\n')
+      }
+
+      if (isSetup) {
+        if (role === 'member') {
+          return [
+            '最初はこの順がおすすめです。',
+            '1. 担当現場を確認 / 選ぶ',
+            '2. main-chat で日報・経費を入力',
+            '',
+            '次は「担当の現場を確認したい」と送ってください。',
+          ].join('\n')
+        }
+
+        return [
+          '最初はこの順がおすすめです。',
+          '1. 会社情報を設定（請求/見積）',
+          '2. 現場を作る / 選ぶ',
+          '3. main-chat で日報・経費などを入力',
+          '',
+          '次は「会社情報を設定したい」または「現場を作りたい」と送ってください。',
+        ].join('\n')
+      }
+
+      if (isProjectCheck && role === 'member') {
+        return [
+          'OKです。担当の現場は「現場を選ぶ」から確認できます。',
+          '',
+          '次は左上メニュー →「現場を選ぶ」を押すか、ここに「現場を選びたい」と送ってください。',
+        ].join('\n')
+      }
+
+      return null
+    })()
+
+    if (guideReply) {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: guideReply,
+        sender: 'ai',
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, aiMessage])
+      return
+    }
+
     // 常用・応援の請求候補（下書き作成）
     const supportBillingCmd = parseSupportBillingDraftCommand(trimmed)
     if (supportBillingCmd) {
