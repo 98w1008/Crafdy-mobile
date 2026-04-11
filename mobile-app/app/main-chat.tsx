@@ -1901,7 +1901,7 @@ export default function SimpleChatScreen() {
             if (!updated) {
               const aiMessage: Message = {
                 id: (Date.now() + 1).toString(),
-                text: `更新に失敗しました（現場が見つかりません）。現場を選び直してください。`,
+                text: `更新に失敗しました（現場が見つかりません）。右上「現場」から選び直してください。`,
                 sender: 'ai',
                 timestamp: new Date(),
               }
@@ -1939,7 +1939,7 @@ export default function SimpleChatScreen() {
       if (!selectedProject?.id) {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: '経費を登録するには現場を選択してください。',
+          text: '経費を登録するには、先に現場を選んでください（右上「現場」）。',
           sender: 'ai',
           timestamp: new Date(),
         }
@@ -2365,7 +2365,7 @@ export default function SimpleChatScreen() {
           if (!updated) {
             const aiMessage: Message = {
               id: (Date.now() + 1).toString(),
-              text: `更新に失敗しました（現場が見つかりません）。現場を選び直してください。`,
+              text: `更新に失敗しました（現場が見つかりません）。右上「現場」から選び直してください。`,
               sender: 'ai',
               timestamp: new Date(),
             }
