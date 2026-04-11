@@ -93,7 +93,7 @@ function AppShell({ loaded }: { loaded: boolean }) {
     if (pathname?.startsWith('/join')) return
 
     if (authStatus !== 'signed_out') return
-    router.replace('/(auth)/auth-screen' as any)
+    router.replace({ pathname: '/(auth)/auth-screen', params: { returnTo: String(pathname || '') } } as any)
   }, [authStatus, isAuthRoute, pathname])
 
   // Load Chat-only toggle

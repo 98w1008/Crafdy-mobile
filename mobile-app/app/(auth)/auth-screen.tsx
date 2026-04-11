@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native'
-import { Link } from 'expo-router'
+import { Link, useLocalSearchParams } from 'expo-router'
 
 export default function AuthScreen() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>()
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -40,8 +42,11 @@ export default function AuthScreen() {
         {/* Auth Buttons Section */}
         <View style={styles.authSection}>
           <Text style={styles.sectionTitle}>参加方法を選んでください</Text>
+          {String(returnTo || '').trim() ? (
+            <Text style={styles.returnHint}>ログイン後は元の画面に戻ります</Text>
+          ) : null}
 
-          <Link href="/(auth)/login" asChild>
+          <Link href={{ pathname: '/(auth)/login', params: { returnTo: String(returnTo || '') } }} asChild>
             <TouchableOpacity style={[styles.button, styles.loginButton]}>
               <Text style={[styles.buttonText, styles.loginButtonText]}>
                 既存アカウントでログイン
@@ -52,7 +57,7 @@ export default function AuthScreen() {
             </TouchableOpacity>
           </Link>
 
-          <Link href="/(auth)/signup" asChild>
+          <Link href={{ pathname: '/(auth)/signup', params: { returnTo: String(returnTo || '') } }} asChild>
             <TouchableOpacity style={[styles.button, styles.signupButton]}>
               <Text style={[styles.buttonText, styles.signupButtonText]}>
                 代表・親方としてはじめる
@@ -168,6 +173,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#334155',
+    marginBottom: 6,
+  },
+  returnHint: {
+    width: '100%',
+    fontSize: 12,
+    color: '#64748B',
     marginBottom: 12,
   },
   button: {

@@ -41,8 +41,9 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert('ログインできません', toAuthErrorText(error.message))
       } else {
-        const to = String(returnTo || '').trim() || '/main-chat'
-        router.replace(to as any)
+        const to = String(returnTo || '').trim()
+        const safeTo = to.startsWith('/(auth)') ? '' : to
+        router.replace((safeTo || '/main-chat') as any)
       }
     } catch (error) {
       Alert.alert('エラー', 'ログインに失敗しました')
@@ -109,7 +110,7 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.linkButton}
-            onPress={() => router.push('/(auth)/signup')}
+            onPress={() => router.push({ pathname: '/(auth)/signup', params: { returnTo: String(returnTo || '') } } as any)}
           >
             <Text style={styles.linkText}>
               親方・代表アカウントを作成
