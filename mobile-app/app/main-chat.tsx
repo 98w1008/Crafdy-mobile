@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Pressable,
+  useColorScheme,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
@@ -18,7 +19,7 @@ import { supabase, supabaseReady } from '@/lib/supabase'
 
 // NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
 const ASK_NEXT_PLAN_IN_MVP = false
-import { Colors, Spacing, Typography, BorderRadius, Shadows } from '@/constants/Colors'
+import { Colors, Spacing, Typography, BorderRadius, Shadows, getThemeColors, type ColorScheme } from '@/constants/Colors'
 import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
 import { createExpense, ExpenseKind, submitExpense } from '@/lib/expense-store'
 import {
@@ -1337,6 +1338,8 @@ export default function SimpleChatScreen() {
   const [inputText, setInputText] = useState('')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isPlusSheetOpen, setIsPlusSheetOpen] = useState(false)
+  const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false)
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system')
 
   const scrollViewRef = useRef<ScrollView | null>(null)
   const inputRef = useRef<TextInput | null>(null)
@@ -2778,6 +2781,11 @@ export default function SimpleChatScreen() {
   const isEmpty = messages.length === 0
   const menuRole = access?.kind === 'assigned' ? access.role : 'unassigned'
 
+  const systemScheme = useColorScheme()
+  const resolvedScheme: ColorScheme =
+    themeMode === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : themeMode
+  const theme = getThemeColors(resolvedScheme)
+
   const handleProjectButton = () => {
     openProjectSelector()
   }
@@ -2790,6 +2798,16 @@ export default function SimpleChatScreen() {
 
   const openPlusSheet = () => setIsPlusSheetOpen(true)
   const closePlusSheet = () => setIsPlusSheetOpen(false)
+
+  const openThemeSheet = () => {
+    closeMenu()
+    setIsThemeSheetOpen(true)
+  }
+  const closeThemeSheet = () => setIsThemeSheetOpen(false)
+  const applyThemeMode = (next: 'light' | 'dark' | 'system') => {
+    setThemeMode(next)
+    closeThemeSheet()
+  }
   const handlePlusAction = (kind: 'photo' | 'camera' | 'file' | 'receipt') => {
     closePlusSheet()
 
@@ -2816,24 +2834,24 @@ export default function SimpleChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background.primary }]}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: theme.background.primary }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         {/* ヘッダー（Figma寄せ: 左メニュー / 中央タイトル / 右上 現場） */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light }]}>
           <TouchableOpacity style={styles.headerMenuButton} onPress={() => setIsMenuOpen(true)}>
-            <Text style={styles.headerMenuButtonText}>≡</Text>
+            <Text style={[styles.headerMenuButtonText, { color: theme.text.primary }]}>≡</Text>
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Crafdy</Text>
+            <Text style={[styles.headerTitle, { color: theme.text.primary }]}>Crafdy</Text>
           </View>
 
           <TouchableOpacity style={styles.headerProjectButton} onPress={handleProjectButton}>
-            <Text style={styles.headerProjectButtonText}>{selectedProject ? '現場切替' : '現場を選ぶ'}</Text>
+            <Text style={[styles.headerProjectButtonText, { color: theme.text.primary }]}>{selectedProject ? '現場切替' : '現場を選ぶ'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -2845,19 +2863,19 @@ export default function SimpleChatScreen() {
           onRequestClose={closeMenu}
         >
           <Pressable style={styles.menuOverlay} onPress={closeMenu}>
-            <Pressable style={styles.menuPanel} onPress={() => { /* stop propagation */ }}>
+            <Pressable style={[styles.menuPanel, { backgroundColor: theme.background.primary, borderRightColor: theme.border.light }]} onPress={() => { /* stop propagation */ }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
-                <Text style={styles.menuTitle}>メニュー</Text>
+                <Text style={[styles.menuTitle, { color: theme.text.primary }]}>メニュー</Text>
                 <View style={{ flex: 1 }} />
                 <TouchableOpacity onPress={closeMenu} accessibilityLabel="閉じる">
-                  <Text style={styles.menuCloseIcon}>×</Text>
+                  <Text style={[styles.menuCloseIcon, { color: theme.text.secondary }]}>×</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.menuSectionTitle}>現在の現場</Text>
+              <Text style={[styles.menuSectionTitle, { color: theme.text.tertiary }]}>現在の現場</Text>
               <View style={styles.menuItems}>
-                <TouchableOpacity style={styles.menuItem} onPress={handleProjectButton}>
-                  <Text style={styles.menuItemText}>{selectedProject?.name || '未選択（現場を選ぶ）'}</Text>
+                <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.background.surface, borderColor: theme.border.medium }]} onPress={handleProjectButton}>
+                  <Text style={[styles.menuItemText, { color: theme.text.primary }]}>{selectedProject?.name || '未選択（現場を選ぶ）'}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -2917,7 +2935,7 @@ export default function SimpleChatScreen() {
                       <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/company-billing-profile')}><Text style={styles.menuItemText}>会社情報</Text></TouchableOpacity>
                       <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/invoice-templates')}><Text style={styles.menuItemText}>請求書テンプレ</Text></TouchableOpacity>
                       <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/billing')}><Text style={styles.menuItemText}>契約・プラン</Text></TouchableOpacity>
-                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('表示テーマ')}><Text style={styles.menuItemText}>表示テーマ</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={openThemeSheet}><Text style={styles.menuItemText}>表示テーマ</Text></TouchableOpacity>
                     </View>
                   </View>
                   <View style={{ marginTop: Spacing.lg }}>
@@ -2934,6 +2952,51 @@ export default function SimpleChatScreen() {
           </Pressable>
         </Modal>
 
+        {/* 表示テーマ */}
+        <Modal
+          visible={isThemeSheetOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={closeThemeSheet}
+        >
+          <Pressable style={styles.plusSheetOverlay} onPress={closeThemeSheet}>
+            <Pressable style={[styles.plusSheetPanel, { backgroundColor: theme.background.primary, borderColor: theme.border.medium }]} onPress={() => { /* stop propagation */ }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
+                <Text style={[styles.plusSheetTitle, { color: theme.text.primary }]}>表示テーマ</Text>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity onPress={closeThemeSheet} accessibilityLabel="閉じる">
+                  <Text style={[styles.plusSheetCloseText, { color: theme.text.secondary }]}>×</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ color: theme.text.secondary, fontSize: Typography.sizes.xs, marginBottom: Spacing.md }}>
+                お好みの表示モードを選択
+              </Text>
+
+              <View style={{ gap: Spacing.md }}>
+                <TouchableOpacity
+                  style={[styles.plusSheetItem, themeMode === 'light' && { borderColor: Colors.accent.DEFAULT }]}
+                  onPress={() => applyThemeMode('light')}
+                >
+                  <Text style={styles.plusSheetItemText}>ライト {themeMode === 'light' ? '✓' : ''}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.plusSheetItem, themeMode === 'dark' && { borderColor: Colors.accent.DEFAULT }]}
+                  onPress={() => applyThemeMode('dark')}
+                >
+                  <Text style={styles.plusSheetItemText}>ダーク {themeMode === 'dark' ? '✓' : ''}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.plusSheetItem, themeMode === 'system' && { borderColor: Colors.accent.DEFAULT }]}
+                  onPress={() => applyThemeMode('system')}
+                >
+                  <Text style={styles.plusSheetItemText}>端末に合わせる {themeMode === 'system' ? '✓' : ''}</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
         {/* 添付アクション（+） */}
         <Modal
           visible={isPlusSheetOpen}
@@ -2942,12 +3005,12 @@ export default function SimpleChatScreen() {
           onRequestClose={closePlusSheet}
         >
           <Pressable style={styles.plusSheetOverlay} onPress={closePlusSheet}>
-            <Pressable style={styles.plusSheetPanel} onPress={() => { /* stop propagation */ }}>
+            <Pressable style={[styles.plusSheetPanel, { backgroundColor: theme.background.primary, borderColor: theme.border.medium }]} onPress={() => { /* stop propagation */ }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
-                <Text style={styles.plusSheetTitle}>添付（ファイルや写真を追加）</Text>
+                <Text style={[styles.plusSheetTitle, { color: theme.text.primary }]}>添付（ファイルや写真を追加）</Text>
                 <View style={{ flex: 1 }} />
                 <TouchableOpacity onPress={closePlusSheet} accessibilityLabel="閉じる">
-                  <Text style={styles.plusSheetCloseText}>×</Text>
+                  <Text style={[styles.plusSheetCloseText, { color: theme.text.secondary }]}>×</Text>
                 </TouchableOpacity>
               </View>
 
@@ -2979,15 +3042,15 @@ export default function SimpleChatScreen() {
         >
           {isEmpty ? (
             <View style={styles.emptyState}>
-              <View style={styles.emptyHeroCard}>
-                <Text style={styles.emptyStateText}>
+              <View style={[styles.emptyHeroCard, { backgroundColor: theme.background.surface, borderColor: theme.border.medium }]}>
+                <Text style={[styles.emptyStateText, { color: theme.text.primary }]}>
                   {displayName ? `${displayName}さん、お疲れさまです。` : 'お疲れさまです。'}
                   {'\n'}今日は何を手伝いましょうか？
                 </Text>
-                <Text style={styles.emptyStateSubtext}>
+                <Text style={[styles.emptyStateSubtext, { color: theme.text.secondary }]}>
                   日報・経費・請求・見積を、チャットでそのまま進められます。
                 </Text>
-                <Text style={styles.emptyStateHint}>
+                <Text style={[styles.emptyStateHint, { color: theme.text.tertiary }]}>
                   まずは下のボタン、または入力欄の chips から選んでください。
                 </Text>
 
@@ -3057,7 +3120,7 @@ export default function SimpleChatScreen() {
 
             <TextInput
               ref={(r) => { inputRef.current = r }}
-              style={styles.input}
+              style={[styles.input, { color: theme.text.primary }]}
               value={inputText}
               onChangeText={setInputText}
               placeholder={
@@ -3065,7 +3128,7 @@ export default function SimpleChatScreen() {
                   ? '例）日報を入力したい / 経費12000円'
                   : '例）日報を入力したい / 経費12000円 / 現場はあとでOK'
               }
-              placeholderTextColor={Colors.dark.text.tertiary}
+              placeholderTextColor={theme.text.tertiary}
               multiline
               maxLength={1000}
             />
