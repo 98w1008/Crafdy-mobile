@@ -1336,6 +1336,7 @@ export default function SimpleChatScreen() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isPlusSheetOpen, setIsPlusSheetOpen] = useState(false)
 
   const scrollViewRef = useRef<ScrollView | null>(null)
   const inputRef = useRef<TextInput | null>(null)
@@ -2782,6 +2783,24 @@ export default function SimpleChatScreen() {
 
   const closeMenu = () => setIsMenuOpen(false)
 
+  const openPlusSheet = () => setIsPlusSheetOpen(true)
+  const closePlusSheet = () => setIsPlusSheetOpen(false)
+  const handlePlusAction = (kind: 'photo' | 'camera' | 'file' | 'receipt') => {
+    closePlusSheet()
+
+    const title =
+      kind === 'photo'
+        ? '写真を追加'
+        : kind === 'camera'
+          ? 'カメラで撮る'
+          : kind === 'file'
+            ? 'ファイルを添付'
+            : 'レシートを追加'
+
+    // 最小安全実装: まずUIと導線だけ作り、実処理は次PRで接続
+    Alert.alert(title, 'この操作は次のPRで接続予定です。')
+  }
+
   const navigateFromMenu = (path: string) => {
     closeMenu()
     router.push(path as any)
@@ -2845,6 +2864,41 @@ export default function SimpleChatScreen() {
               <View style={{ marginTop: Spacing.md }}>
                 <TouchableOpacity style={styles.menuCloseButton} onPress={closeMenu}>
                   <Text style={styles.menuCloseButtonText}>閉じる</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* 添付アクション（+） */}
+        <Modal
+          visible={isPlusSheetOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={closePlusSheet}
+        >
+          <Pressable style={styles.plusSheetOverlay} onPress={closePlusSheet}>
+            <Pressable style={styles.plusSheetPanel} onPress={() => { /* stop propagation */ }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
+                <Text style={styles.plusSheetTitle}>添付（ファイルや写真を追加）</Text>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity onPress={closePlusSheet} accessibilityLabel="閉じる">
+                  <Text style={styles.plusSheetCloseText}>×</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.plusSheetGrid}>
+                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('photo')}>
+                  <Text style={styles.plusSheetItemText}>写真を追加</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('camera')}>
+                  <Text style={styles.plusSheetItemText}>カメラで撮る</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('file')}>
+                  <Text style={styles.plusSheetItemText}>ファイルを添付</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('receipt')}>
+                  <Text style={styles.plusSheetItemText}>レシートを追加</Text>
                 </TouchableOpacity>
               </View>
             </Pressable>
@@ -2931,7 +2985,7 @@ export default function SimpleChatScreen() {
           <View style={styles.inputRow}>
             <TouchableOpacity
               style={styles.plusButton}
-              onPress={() => { /* PR82-2 で action sheet を実装 */ }}
+              onPress={openPlusSheet}
               accessibilityLabel="添付"
             >
               <Text style={styles.plusButtonText}>＋</Text>
@@ -3111,6 +3165,52 @@ const styles = StyleSheet.create({
   },
   menuCloseButtonText: {
     color: Colors.dark.text.secondary,
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+
+  plusSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    padding: Spacing.lg,
+  },
+  plusSheetPanel: {
+    backgroundColor: Colors.dark.background.primary,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+    padding: Spacing.lg,
+  },
+  plusSheetTitle: {
+    color: Colors.dark.text.primary,
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.bold,
+  },
+  plusSheetCloseText: {
+    color: Colors.dark.text.secondary,
+    fontSize: 22,
+    fontWeight: Typography.weights.bold,
+  },
+  plusSheetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  plusSheetItem: {
+    width: '48%',
+    minHeight: 72,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.dark.background.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.medium,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    justifyContent: 'center',
+  },
+  plusSheetItemText: {
+    color: Colors.dark.text.primary,
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
   },
