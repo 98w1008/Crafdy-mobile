@@ -2776,12 +2776,17 @@ export default function SimpleChatScreen() {
 
   const canSend = !!inputText.trim()
   const isEmpty = messages.length === 0
+  const menuRole = access?.kind === 'assigned' ? access.role : 'unassigned'
 
   const handleProjectButton = () => {
     openProjectSelector()
   }
 
   const closeMenu = () => setIsMenuOpen(false)
+
+  const stubMenu = (title: string) => { closeMenu(); Alert.alert(title, 'このメニューは次のPRで接続予定です。') }
+
+  const handleLogout = async () => { closeMenu(); try { if (supabaseReady && supabase) await supabase.auth.signOut() } catch { /* ignore */ }; router.replace('/(auth)/auth-screen' as any) }
 
   const openPlusSheet = () => setIsPlusSheetOpen(true)
   const closePlusSheet = () => setIsPlusSheetOpen(false)
@@ -2832,7 +2837,7 @@ export default function SimpleChatScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 左メニュー（最小導線） */}
+        {/* Drawer menu（低頻度ナビゲーション） */}
         <Modal
           visible={isMenuOpen}
           transparent
@@ -2841,31 +2846,90 @@ export default function SimpleChatScreen() {
         >
           <Pressable style={styles.menuOverlay} onPress={closeMenu}>
             <Pressable style={styles.menuPanel} onPress={() => { /* stop propagation */ }}>
-              <Text style={styles.menuTitle}>メニュー</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
+                <Text style={styles.menuTitle}>メニュー</Text>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity onPress={closeMenu} accessibilityLabel="閉じる">
+                  <Text style={styles.menuCloseIcon}>×</Text>
+                </TouchableOpacity>
+              </View>
 
+              <Text style={styles.menuSectionTitle}>現在の現場</Text>
               <View style={styles.menuItems}>
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/(tabs)/dashboard')}>
-                  <Text style={styles.menuItemText}>ダッシュボード</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/project-selector')}>
-                  <Text style={styles.menuItemText}>現場を選ぶ</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/company-billing-profile')}>
-                  <Text style={styles.menuItemText}>会社情報（請求/見積）</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/invoice-templates')}>
-                  <Text style={styles.menuItemText}>請求書テンプレート</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/support-invoice-drafts')}>
-                  <Text style={styles.menuItemText}>請求書下書き一覧</Text>
+                <TouchableOpacity style={styles.menuItem} onPress={handleProjectButton}>
+                  <Text style={styles.menuItemText}>{selectedProject?.name || '未選択（現場を選ぶ）'}</Text>
                 </TouchableOpacity>
               </View>
 
-              <View style={{ marginTop: Spacing.md }}>
-                <TouchableOpacity style={styles.menuCloseButton} onPress={closeMenu}>
-                  <Text style={styles.menuCloseButtonText}>閉じる</Text>
-                </TouchableOpacity>
-              </View>
+              {menuRole === 'member' ? (
+                <>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>仕事</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/(tabs)/dashboard')}><Text style={styles.menuItemText}>ダッシュボード</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/project-selector')}><Text style={styles.menuItemText}>現場一覧 / 切り替え</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>その他</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('アカウント')}><Text style={styles.menuItemText}>アカウント</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('ヘルプ')}><Text style={styles.menuItemText}>ヘルプ</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={handleLogout}><Text style={styles.menuItemText}>ログアウト</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              ) : menuRole === 'unassigned' ? (
+                <>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>はじめに</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/join/by-code')}><Text style={styles.menuItemText}>招待コードで参加</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>その他</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('ヘルプ')}><Text style={styles.menuItemText}>ヘルプ</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>仕事</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/(tabs)/dashboard')}><Text style={styles.menuItemText}>ダッシュボード</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/project-selector')}><Text style={styles.menuItemText}>現場一覧 / 切り替え</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/invoice')}><Text style={styles.menuItemText}>請求書履歴</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('見積履歴')}><Text style={styles.menuItemText}>見積履歴</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>チーム</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('メンバーを招待')}><Text style={styles.menuItemText}>メンバーを招待</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>設定</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/company-billing-profile')}><Text style={styles.menuItemText}>会社情報</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/invoice-templates')}><Text style={styles.menuItemText}>請求書テンプレ</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => navigateFromMenu('/billing')}><Text style={styles.menuItemText}>契約・プラン</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('表示テーマ')}><Text style={styles.menuItemText}>表示テーマ</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: Spacing.lg }}>
+                    <Text style={styles.menuSectionTitle}>その他</Text>
+                    <View style={styles.menuItems}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('アカウント')}><Text style={styles.menuItemText}>アカウント</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => stubMenu('ヘルプ')}><Text style={styles.menuItemText}>ヘルプ</Text></TouchableOpacity>
+                      <TouchableOpacity style={styles.menuItem} onPress={handleLogout}><Text style={styles.menuItemText}>ログアウト</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              )}
             </Pressable>
           </Pressable>
         </Modal>
@@ -3136,7 +3200,18 @@ const styles = StyleSheet.create({
     color: Colors.dark.text.primary,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.md,
+  },
+  menuCloseIcon: {
+    color: Colors.dark.text.secondary,
+    fontSize: 22,
+    fontWeight: Typography.weights.bold,
+  },
+  menuSectionTitle: {
+    color: Colors.dark.text.tertiary,
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
   },
   menuItems: {
     gap: Spacing.sm,
