@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
+import { supabase, supabaseReady } from '@/lib/supabase'
 
 // NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
 const ASK_NEXT_PLAN_IN_MVP = false
@@ -1351,6 +1352,7 @@ export default function SimpleChatScreen() {
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<{ address?: string; memo?: string; revenue?: number } | null>(null)
 
   const [access, setAccess] = useState<AccessContext | null>(null)
+  const [displayName, setDisplayName] = useState<string>('')
 
   const [currentIntent, setCurrentIntent] = useState<IntentCategory | null>(null)
   const [intentStep, setIntentStep] = useState(0)
@@ -1390,31 +1392,32 @@ export default function SimpleChatScreen() {
   const promptChips = (() => {
     const role = access?.kind === 'assigned' ? access.role : 'unassigned'
 
-    if (role === 'owner' || role === 'office') {
-      return [
-        { id: 'what', label: '何ができる？', text: 'クラフディで何ができますか？' },
-        { id: 'setup', label: '最初に設定は？', text: '最初に何を設定すればいいですか？' },
-        { id: 'report', label: '日報を入力', text: '日報を入力したいです。必要な情報を聞いてください。' },
-        { id: 'expense', label: '経費を登録', text: '経費を登録したいです。必要な情報を聞いてください。' },
-        { id: 'invoice', label: '請求書を作る', text: '請求書を作りたいです。必要な情報を聞いてください。' },
-      ]
-    }
+    const common = [
+      { id: 'daily', label: '日報を入力', text: '日報を入力したいです。必要な情報を聞いてください。' },
+      { id: 'expense', label: '経費を登録', text: '経費を登録したいです。必要な情報を聞いてください。' },
+      { id: 'invoice', label: '請求書を作る', text: '請求書を作りたいです。必要な情報を聞いてください。' },
+      { id: 'estimate', label: '見積を作る', text: '見積を作りたいです。必要な情報を聞いてください。' },
+      { id: 'what', label: '何ができる？', text: 'クラフディで何ができますか？' },
+      { id: 'setup', label: '最初に設定は？', text: '最初に何を設定すればいいですか？' },
+    ]
 
     if (role === 'member') {
       return [
+        { id: 'daily', label: '日報を入力', text: '日報を入力したいです。必要な情報を聞いてください。' },
+        { id: 'expense', label: '経費を登録', text: '経費を登録したいです。必要な情報を聞いてください。' },
         { id: 'what', label: '何ができる？', text: '職長・従業員として、何ができますか？' },
-        { id: 'project', label: '担当現場を確認', text: '担当の現場を確認したいです。' },
-        { id: 'report', label: '日報を書く', text: '日報を入力したいです。必要な情報を聞いてください。' },
-        { id: 'expense', label: '経費を入れる', text: '経費を登録したいです。必要な情報を聞いてください。' },
+        { id: 'setup', label: '最初に何する？', text: '最初に何をすればいいですか？' },
       ]
     }
 
-    return [
-      { id: 'what', label: '何ができる？', text: 'クラフディで何ができますか？' },
-      { id: 'setup', label: '最初に設定は？', text: '最初に何を設定すればいいですか？' },
-      { id: 'report', label: '日報を入力', text: '日報を入力したいです。必要な情報を聞いてください。' },
-      { id: 'expense', label: '経費を登録', text: '経費を登録したいです。必要な情報を聞いてください。' },
-    ]
+    if (role === 'unassigned') {
+      return [
+        { id: 'what', label: '何ができる？', text: 'クラフディで何ができますか？' },
+        { id: 'setup', label: '最初に何する？', text: '最初に何をすればいいですか？' },
+      ]
+    }
+
+    return common
   })()
 
   const handleChipPress = (text: string) => {
@@ -1463,6 +1466,15 @@ export default function SimpleChatScreen() {
       try {
         const ctx = await getAccessContext()
         setAccess(ctx)
+      } catch {
+        // ignore
+      }
+
+      try {
+        if (!supabaseReady || !supabase) return
+        const { data } = await supabase.auth.getUser()
+        const name = String((data?.user as any)?.user_metadata?.full_name || '').trim()
+        if (name) setDisplayName(name)
       } catch {
         // ignore
       }
@@ -2786,26 +2798,18 @@ export default function SimpleChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-        {/* ヘッダー（チャット主役 / 現場は補助） */}
+        {/* ヘッダー（Figma寄せ: 左メニュー / 中央タイトル / 右上 現場） */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.headerMenuButton} onPress={() => setIsMenuOpen(true)}>
             <Text style={styles.headerMenuButtonText}>≡</Text>
           </TouchableOpacity>
 
-          <View style={styles.headerLeft}>
+          <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>Crafdy</Text>
-            <Text style={styles.headerSubtitle}>
-              現場: {selectedProject ? selectedProject.name : '未選択（右の「現場」から選択/作成）'}
-              {selectedProject && selectedProjectDetails?.revenue
-                ? ` / 売上: ¥${selectedProjectDetails.revenue.toLocaleString('ja-JP')}`
-                : selectedProject
-                  ? ' / 売上: 未設定'
-                  : ''}
-              {selectedProject && selectedProjectDetails?.address ? ` / 住所: ${selectedProjectDetails.address}` : ''}
-            </Text>
           </View>
+
           <TouchableOpacity style={styles.headerProjectButton} onPress={handleProjectButton}>
-            <Text style={styles.headerProjectButtonText}>現場</Text>
+            <Text style={styles.headerProjectButtonText}>{selectedProject ? '現場切替' : '現場を選ぶ'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -2858,12 +2862,15 @@ export default function SimpleChatScreen() {
           {isEmpty ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyHeroCard}>
-                <Text style={styles.emptyStateText}>チャットで何をしますか？</Text>
+                <Text style={styles.emptyStateText}>
+                  {displayName ? `${displayName}さん、お疲れさまです。` : 'お疲れさまです。'}
+                  {'\n'}今日は何を手伝いましょうか？
+                </Text>
                 <Text style={styles.emptyStateSubtext}>
-                  まずは下のボタンから始めるのがおすすめです。
+                  日報・経費・請求・見積を、チャットでそのまま進められます。
                 </Text>
                 <Text style={styles.emptyStateHint}>
-                  迷ったら chips（例:「何ができる？」）を押すと、使い方を案内します。
+                  まずは下のボタン、または入力欄の chips から選んでください。
                 </Text>
 
                 <View style={styles.emptyQuickActionsRow}>
@@ -2922,6 +2929,14 @@ export default function SimpleChatScreen() {
           </ScrollView>
 
           <View style={styles.inputRow}>
+            <TouchableOpacity
+              style={styles.plusButton}
+              onPress={() => { /* PR82-2 で action sheet を実装 */ }}
+              accessibilityLabel="添付"
+            >
+              <Text style={styles.plusButtonText}>＋</Text>
+            </TouchableOpacity>
+
             <TextInput
               ref={(r) => { inputRef.current = r }}
               style={styles.input}
@@ -2936,13 +2951,24 @@ export default function SimpleChatScreen() {
               multiline
               maxLength={1000}
             />
-            <TouchableOpacity
-              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-              onPress={handleSend}
-              disabled={!canSend}
-            >
-              <Text style={styles.sendButtonText}>送信</Text>
-            </TouchableOpacity>
+
+            {canSend ? (
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={handleSend}
+                accessibilityLabel="送信"
+              >
+                <Text style={styles.sendButtonText}>送信</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.voiceButton}
+                onPress={() => { /* いったん未実装 */ }}
+                accessibilityLabel="音声入力"
+              >
+                <Text style={styles.voiceButtonText}>🎤</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -3013,19 +3039,16 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: Typography.weights.bold,
   },
-  headerLeft: {
+  headerCenter: {
     flex: 1,
-    gap: 2,
+    alignItems: 'center',
   },
   headerTitle: {
     color: Colors.dark.text.primary,
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },
-  headerSubtitle: {
-    color: Colors.dark.text.tertiary,
-    fontSize: Typography.sizes.xs,
-  },
+  // headerSubtitle removed (Figma寄せ)
   headerProjectButton: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -3119,19 +3142,19 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     marginBottom: Spacing.sm,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   emptyStateSubtext: {
     color: Colors.dark.text.secondary,
     fontSize: Typography.sizes.sm,
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 20,
     marginBottom: Spacing.sm,
   },
   emptyStateHint: {
     color: Colors.dark.text.tertiary,
     fontSize: Typography.sizes.xs,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: Spacing.xl,
   },
   emptyQuickActionsRow: {
@@ -3278,39 +3301,65 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
     alignItems: 'flex-end',
+    gap: Spacing.sm,
+    backgroundColor: Colors.dark.background.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.dark.border.medium,
+    borderRadius: BorderRadius.full,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  plusButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.accent.DEFAULT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plusButtonText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: Typography.weights.bold,
+    marginTop: -1,
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.dark.background.primary,
+    borderWidth: 1,
+    borderColor: Colors.dark.border.light,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceButtonText: {
+    color: Colors.dark.text.primary,
+    fontSize: 18,
   },
   input: {
     flex: 1,
-    backgroundColor: Colors.dark.background.surface,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
     color: Colors.dark.text.primary,
     fontSize: Typography.sizes.base,
     lineHeight: Typography.lineHeights.normal * Typography.sizes.base,
-    minHeight: 56,
-    maxHeight: 140,
-    borderWidth: 1.5,
-    borderColor: Colors.dark.border.medium,
+    minHeight: 44,
+    maxHeight: 120,
   },
   sendButton: {
     backgroundColor: Colors.accent.DEFAULT,
     borderRadius: BorderRadius.full,
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     ...Shadows.md,
   },
-  sendButtonDisabled: {
-    backgroundColor: Colors.dark.interactive.disabled,
-    opacity: 0.5,
-  },
   sendButtonText: {
     color: '#FFFFFF',
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.bold,
   },
   modalOverlay: {
