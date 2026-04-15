@@ -18,6 +18,7 @@ import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import { supabase, supabaseReady } from '@/lib/supabase'
 import Feather from '@expo/vector-icons/Feather'
 import { MainChatHomeView } from '@/components/chat/MainChatHomeView'
+import { MainChatAttachSheetView } from '@/components/chat/MainChatAttachSheetView'
 
 // NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
 const ASK_NEXT_PLAN_IN_MVP = false
@@ -3020,40 +3021,13 @@ export default function SimpleChatScreen() {
           </Pressable>
         </Modal>
 
-        {/* 添付アクション（+） */}
-        <Modal
+        {/* 添付アクション（+） — Phase 1 純UI再現 */}
+        <MainChatAttachSheetView
           visible={isPlusSheetOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={closePlusSheet}
-        >
-          <Pressable style={styles.plusSheetOverlay} onPress={closePlusSheet}>
-            <Pressable style={[styles.plusSheetPanel, { backgroundColor: theme.background.primary, borderColor: theme.border.medium }]} onPress={() => { /* stop propagation */ }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
-                <Text style={[styles.plusSheetTitle, { color: theme.text.primary }]}>添付（ファイルや写真を追加）</Text>
-                <View style={{ flex: 1 }} />
-                <TouchableOpacity onPress={closePlusSheet} accessibilityLabel="閉じる">
-                  <Text style={[styles.plusSheetCloseText, { color: theme.text.secondary }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.plusSheetGrid}>
-                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('photo')}>
-                  <Text style={styles.plusSheetItemText}>写真を追加</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('camera')}>
-                  <Text style={styles.plusSheetItemText}>カメラで撮る</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('file')}>
-                  <Text style={styles.plusSheetItemText}>ファイルを添付</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.plusSheetItem} onPress={() => handlePlusAction('receipt')}>
-                  <Text style={styles.plusSheetItemText}>レシートを追加</Text>
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
+          onClose={closePlusSheet}
+          onAction={handlePlusAction}
+          isDark={resolvedScheme === 'dark'}
+        />
 
         {/* メッセージ一覧 */}
         <ScrollView
