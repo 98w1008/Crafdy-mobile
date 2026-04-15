@@ -3041,32 +3041,18 @@ export default function SimpleChatScreen() {
           onContentSizeChange={() => scrollToBottom(10)}
         >
           {isEmpty ? (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyHeroCard, { backgroundColor: theme.background.surface, borderColor: theme.border.medium }]}>
-                <Text style={[styles.emptyStateText, { color: theme.text.primary }]}>
+            <View style={styles.homeContainer}>
+              <View style={styles.homeWelcome}>
+                <Text style={styles.homeWelcomeTitle}>
                   {displayName ? `${displayName}さん、お疲れさまです。` : 'お疲れさまです。'}
                   {'\n'}今日は何を手伝いましょうか？
                 </Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.text.secondary }]}>
-                  日報・経費・請求・見積を、チャットでそのまま進められます。
+                <Text style={styles.homeWelcomeSubtext}>
+                  日報・経費・請求・見積を、{`\n`}チャットでそのまま進められます。
                 </Text>
-                <Text style={[styles.emptyStateHint, { color: theme.text.tertiary }]}>
-                  まずは下のボタン、または入力欄の chips から選んでください。
-                </Text>
-
-                <View style={styles.emptyQuickActionsRow}>
-                  {emptyQuickActions.map(action => (
-                    <TouchableOpacity
-                      key={action.id}
-                      style={styles.emptyQuickActionButton}
-                      onPress={() => handleEmptyQuickAction(action)}
-                    >
-                      <Text style={styles.emptyQuickActionButtonLabel}>{action.label}</Text>
-                      <Text style={styles.emptyQuickActionButtonHint}>{action.hint}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
               </View>
+
+              <View style={{ flex: 1 }} />
             </View>
           ) : (
             messages.map(message => (
@@ -3123,11 +3109,7 @@ export default function SimpleChatScreen() {
               style={[styles.input, { color: theme.text.primary }]}
               value={inputText}
               onChangeText={setInputText}
-              placeholder={
-                selectedProject
-                  ? '例）日報を入力したい / 経費12000円'
-                  : '例）日報を入力したい / 経費12000円 / 現場はあとでOK'
-              }
+              placeholder="メッセージを入力..."
               placeholderTextColor={theme.text.tertiary}
               multiline
               maxLength={1000}
@@ -3197,9 +3179,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border.light,
     backgroundColor: Colors.dark.background.primary,
@@ -3357,9 +3339,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContent: {
-    padding: Spacing.xl,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
     flexGrow: 1,
   },
+  homeContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  homeWelcome: {
+    marginTop: 8,
+    marginBottom: 28,
+  },
+  homeWelcomeTitle: {
+    color: Colors.dark.text.primary,
+    fontSize: 32,
+    fontWeight: Typography.weights.medium,
+    lineHeight: 40,
+    marginBottom: 12,
+  },
+  homeWelcomeSubtext: {
+    color: Colors.dark.text.secondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
   emptyState: {
     flex: 1,
     justifyContent: 'flex-start',
@@ -3514,45 +3520,46 @@ const styles = StyleSheet.create({
     lineHeight: Typography.lineHeights.tight * Typography.sizes.xs,
   },
   inputContainer: {
-    padding: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border.light,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
     backgroundColor: Colors.dark.background.primary,
-    gap: Spacing.sm,
+    gap: 12,
   },
   chipsRow: {
-    paddingRight: 6,
-    gap: 8,
+    paddingHorizontal: 20,
+    paddingRight: 20,
+    gap: 10,
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: Colors.dark.background.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: Colors.dark.border.medium,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   chipText: {
     color: Colors.dark.text.primary,
-    fontSize: Typography.sizes.xs,
+    fontSize: 14,
     fontWeight: Typography.weights.semibold,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: Spacing.sm,
+    gap: 10,
     backgroundColor: Colors.dark.background.surface,
-    borderWidth: 1.5,
-    borderColor: Colors.dark.border.medium,
-    borderRadius: BorderRadius.full,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 32,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
   },
   plusButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.accent.DEFAULT,
+    width: 48,
+    height: 48,
+    borderRadius: 999,
+    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3563,12 +3570,12 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
   voiceButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.dark.background.primary,
+    width: 48,
+    height: 48,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
-    borderColor: Colors.dark.border.light,
+    borderColor: 'rgba(255,255,255,0.10)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3588,9 +3595,9 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     backgroundColor: Colors.accent.DEFAULT,
-    borderRadius: BorderRadius.full,
-    width: 44,
-    height: 44,
+    borderRadius: 999,
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
     ...Shadows.md,
