@@ -16,6 +16,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import { supabase, supabaseReady } from '@/lib/supabase'
+import Feather from '@expo/vector-icons/Feather'
+import { MainChatHomeView } from '@/components/chat/MainChatHomeView'
 
 // NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
 const ASK_NEXT_PLAN_IN_MVP = false
@@ -2840,18 +2842,39 @@ export default function SimpleChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-        {/* ヘッダー（Figma寄せ: 左メニュー / 中央タイトル / 右上 現場） */}
-        <View style={[styles.header, { backgroundColor: theme.background.primary, borderBottomColor: theme.border.light }]}>
-          <TouchableOpacity style={styles.headerMenuButton} onPress={() => setIsMenuOpen(true)}>
-            <Text style={[styles.headerMenuButtonText, { color: theme.text.primary }]}>≡</Text>
+        {/* ヘッダー — Figma App.tsx lines 222-248 */}
+        <View style={[styles.header, { backgroundColor: theme.background.primary }]}>
+          {/* 左: ハンバーガー — w-10 h-10 rounded-full bg-white/5 */}
+          <TouchableOpacity
+            style={[
+              styles.headerMenuButton,
+              { backgroundColor: resolvedScheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+            ]}
+            onPress={() => setIsMenuOpen(true)}
+          >
+            <Feather name="menu" size={20} color={theme.text.primary} />
           </TouchableOpacity>
 
+          {/* 中央: Crafdy — text-xl tracking-wide font-medium */}
           <View style={styles.headerCenter}>
             <Text style={[styles.headerTitle, { color: theme.text.primary }]}>Crafdy</Text>
           </View>
 
-          <TouchableOpacity style={styles.headerProjectButton} onPress={handleProjectButton}>
-            <Text style={[styles.headerProjectButtonText, { color: theme.text.primary }]}>{selectedProject ? '現場切替' : '現場を選ぶ'}</Text>
+          {/* 右: 現場切替 — px-3 py-1.5 rounded-full bg-blue-500/12 border border-blue-500/25 */}
+          <TouchableOpacity
+            style={[
+              styles.headerSiteButton,
+              {
+                backgroundColor: resolvedScheme === 'dark' ? 'rgba(59,130,246,0.12)' : 'rgba(59,130,246,0.08)',
+                borderColor: resolvedScheme === 'dark' ? 'rgba(59,130,246,0.25)' : 'rgba(59,130,246,0.20)',
+              },
+            ]}
+            onPress={handleProjectButton}
+          >
+            <Feather name="map-pin" size={12} color={resolvedScheme === 'dark' ? '#60A5FA' : '#2563EB'} />
+            <Text style={[styles.headerSiteText, { color: resolvedScheme === 'dark' ? '#60A5FA' : '#2563EB' }]}>
+              {selectedProject ? '現場切替' : '現場を選ぶ'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -3041,19 +3064,13 @@ export default function SimpleChatScreen() {
           onContentSizeChange={() => scrollToBottom(10)}
         >
           {isEmpty ? (
-            <View style={styles.homeContainer}>
-              <View style={styles.homeWelcome}>
-                <Text style={styles.homeWelcomeTitle}>
-                  {displayName ? `${displayName}さん、お疲れさまです。` : 'お疲れさまです。'}
-                  {'\n'}今日は何を手伝いましょうか？
-                </Text>
-                <Text style={styles.homeWelcomeSubtext}>
-                  日報・経費・請求・見積を、{`\n`}チャットでそのまま進められます。
-                </Text>
-              </View>
-
-              <View style={{ flex: 1 }} />
-            </View>
+            /* Phase 1 純UI再現: MainChatHomeView (welcome + chips) */
+            <MainChatHomeView
+              displayName={displayName}
+              chips={promptChips}
+              onChipPress={handleChipPress}
+              isDark={resolvedScheme === 'dark'}
+            />
           ) : (
             messages.map(message => (
               <View
@@ -3076,26 +3093,42 @@ export default function SimpleChatScreen() {
         </ScrollView>
 
         {/* 入力欄（常に有効） */}
-        <View style={styles.inputContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-            keyboardShouldPersistTaps="handled"
-          >
-            {promptChips.map(chip => (
-              <TouchableOpacity
-                key={chip.id}
-                style={styles.chip}
-                onPress={() => handleChipPress(chip.text)}
-                accessibilityLabel={`プロンプト: ${chip.label}`}
-              >
-                <Text style={styles.chipText} numberOfLines={1}>{chip.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+        <View style={[styles.inputContainer, { backgroundColor: theme.background.primary }]}>
+          {/* chips はメッセージあり時のみ下部に表示（ホーム時は MainChatHomeView 内で表示） */}
+          {!isEmpty && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+              keyboardShouldPersistTaps="handled"
+            >
+              {promptChips.map(chip => (
+                <TouchableOpacity
+                  key={chip.id}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: resolvedScheme === 'dark' ? 'rgba(255,255,255,0.06)' : '#FFFFFF',
+                      borderColor: resolvedScheme === 'dark' ? 'rgba(255,255,255,0.10)' : '#D1D5DB',
+                    },
+                  ]}
+                  onPress={() => handleChipPress(chip.text)}
+                  accessibilityLabel={`プロンプト: ${chip.label}`}
+                >
+                  <Text style={[styles.chipText, { color: theme.text.primary }]} numberOfLines={1}>{chip.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
 
-          <View style={styles.inputRow}>
+          {/* pill型入力欄 — rounded-[32px] p-2.5 from-[#1a2635] to-[#1E293B] border-white/15 */}
+          <View style={[
+            styles.inputRow,
+            {
+              backgroundColor: resolvedScheme === 'dark' ? '#1a2635' : '#FFFFFF',
+              borderColor: resolvedScheme === 'dark' ? 'rgba(255,255,255,0.15)' : '#D1D5DB',
+            },
+          ]}>
             <TouchableOpacity
               style={styles.plusButton}
               onPress={openPlusSheet}
@@ -3115,13 +3148,14 @@ export default function SimpleChatScreen() {
               maxLength={1000}
             />
 
+            {/* 送信 / 音声 — from-emerald-500 to-emerald-600 / bg-white/10 */}
             {canSend ? (
               <TouchableOpacity
-                style={styles.sendButton}
+                style={[styles.sendButton, { backgroundColor: '#10B981' }]}
                 onPress={handleSend}
                 accessibilityLabel="送信"
               >
-                <Text style={styles.sendButtonText}>送信</Text>
+                <Feather name="send" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
@@ -3129,7 +3163,7 @@ export default function SimpleChatScreen() {
                 onPress={() => { /* いったん未実装 */ }}
                 accessibilityLabel="音声入力"
               >
-                <Text style={styles.voiceButtonText}>🎤</Text>
+                <Feather name="mic" size={20} color={resolvedScheme === 'dark' ? '#D1D5DB' : '#6B7280'} />
               </TouchableOpacity>
             )}
           </View>
@@ -3175,6 +3209,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // Figma: flex items-center justify-between px-5 pt-14 pb-5
+  // ボーダーなし (Figma header に border-bottom なし)
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3182,49 +3218,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 56,
     paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border.light,
     backgroundColor: Colors.dark.background.primary,
   },
+  // Figma: w-10 h-10 rounded-full bg-white/5 (40×40, 薄いサークル, ボーダーなし)
   headerMenuButton: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.sm,
-    backgroundColor: Colors.dark.background.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border.medium,
-  },
-  headerMenuButtonText: {
-    color: Colors.dark.text.primary,
-    fontSize: 22,
-    fontWeight: Typography.weights.bold,
   },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
   },
+  // Figma: text-xl tracking-wide font-medium
+  // text-xl = 20px, tracking-wide ≈ letterSpacing 0.5, font-medium = 500
   headerTitle: {
     color: Colors.dark.text.primary,
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
+    fontSize: 20,
+    fontWeight: '500',
+    letterSpacing: 0.5,
   },
-  // headerSubtitle removed (Figma寄せ)
-  headerProjectButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+  // Figma: px-3 py-1.5 rounded-full bg-blue-500/12 border border-blue-500/25
+  // flex items-center gap-1.5 text-xs (12px)
+  headerSiteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: Colors.dark.border.medium,
-    backgroundColor: Colors.dark.background.surface,
-    marginLeft: Spacing.sm,
   },
-  headerProjectButtonText: {
-    color: Colors.dark.text.primary,
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+  // Figma: text-xs text-blue-400
+  headerSiteText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 
   menuOverlay: {
@@ -3583,14 +3613,16 @@ const styles = StyleSheet.create({
     color: Colors.dark.text.primary,
     fontSize: 18,
   },
+  // Figma: flex-1 bg-transparent py-3.5 px-2 text-base min-h-[48px] max-h-[120px]
+  // py-3.5 = 14px, px-2 = 8px, min-h-[48px] = 48px
   input: {
     flex: 1,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 14,
     color: Colors.dark.text.primary,
     fontSize: Typography.sizes.base,
     lineHeight: Typography.lineHeights.normal * Typography.sizes.base,
-    minHeight: 44,
+    minHeight: 48,
     maxHeight: 120,
   },
   sendButton: {
