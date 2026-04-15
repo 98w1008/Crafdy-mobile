@@ -20,6 +20,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { MainChatHomeView } from '@/components/chat/MainChatHomeView'
 import { MainChatAttachSheetView } from '@/components/chat/MainChatAttachSheetView'
 import { MainChatDrawerView, type DrawerAction } from '@/components/chat/MainChatDrawerView'
+import { MainChatThemeSheetView } from '@/components/chat/MainChatThemeSheetView'
 
 // NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
 const ASK_NEXT_PLAN_IN_MVP = false
@@ -2907,50 +2908,14 @@ export default function SimpleChatScreen() {
           currentSiteName={selectedProject?.name ?? null}
         />
 
-        {/* 表示テーマ */}
-        <Modal
+        {/* 表示テーマ — Figma正本準拠移植 (Phase 1 純UI) */}
+        <MainChatThemeSheetView
           visible={isThemeSheetOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={closeThemeSheet}
-        >
-          <Pressable style={styles.plusSheetOverlay} onPress={closeThemeSheet}>
-            <Pressable style={[styles.plusSheetPanel, { backgroundColor: theme.background.primary, borderColor: theme.border.medium }]} onPress={() => { /* stop propagation */ }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
-                <Text style={[styles.plusSheetTitle, { color: theme.text.primary }]}>表示テーマ</Text>
-                <View style={{ flex: 1 }} />
-                <TouchableOpacity onPress={closeThemeSheet} accessibilityLabel="閉じる">
-                  <Text style={[styles.plusSheetCloseText, { color: theme.text.secondary }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={{ color: theme.text.secondary, fontSize: Typography.sizes.xs, marginBottom: Spacing.md }}>
-                お好みの表示モードを選択
-              </Text>
-
-              <View style={{ gap: Spacing.md }}>
-                <TouchableOpacity
-                  style={[styles.plusSheetItem, themeMode === 'light' && { borderColor: Colors.accent.DEFAULT }]}
-                  onPress={() => applyThemeMode('light')}
-                >
-                  <Text style={styles.plusSheetItemText}>ライト {themeMode === 'light' ? '✓' : ''}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.plusSheetItem, themeMode === 'dark' && { borderColor: Colors.accent.DEFAULT }]}
-                  onPress={() => applyThemeMode('dark')}
-                >
-                  <Text style={styles.plusSheetItemText}>ダーク {themeMode === 'dark' ? '✓' : ''}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.plusSheetItem, themeMode === 'system' && { borderColor: Colors.accent.DEFAULT }]}
-                  onPress={() => applyThemeMode('system')}
-                >
-                  <Text style={styles.plusSheetItemText}>端末に合わせる {themeMode === 'system' ? '✓' : ''}</Text>
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
+          onClose={closeThemeSheet}
+          currentTheme={themeMode}
+          onSelectTheme={applyThemeMode}
+          isDark={resolvedScheme === 'dark'}
+        />
 
         {/* 添付アクション（+） — Phase 1 純UI再現 */}
         <MainChatAttachSheetView
