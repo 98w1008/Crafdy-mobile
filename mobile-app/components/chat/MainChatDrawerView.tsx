@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from 'react-native'
 import Feather from '@expo/vector-icons/Feather'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 /**
  * Phase 1 純UI再現: main-chat の左 drawer
@@ -132,6 +133,8 @@ export function MainChatDrawerView({
   isDark,
   currentSiteName,
 }: Props) {
+  const insets = useSafeAreaInsets()
+
   // Figma themeStyles.drawerBg
   // dark:  bg-gradient-to-b from-[#0f1922] to-[#0A1628] → 近似単色
   // light: bg-white
@@ -186,8 +189,8 @@ export function MainChatDrawerView({
             // パネル内タップでオーバーレイ閉じを止める
           }}
         >
-          {/* ===== ヘッダー — pt-14 pb-5 px-5 border-b ===== */}
-          <View style={[styles.header, { borderBottomColor: borderColor }]}>
+          {/* ===== ヘッダー — pt-14 pb-5 px-5 border-b (pt はノッチ対応) ===== */}
+          <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: borderColor }]}>
             {/* flex items-center justify-between mb-3 */}
             <View style={styles.headerRow}>
               {/* h2 text-lg font-medium → "メニュー" */}
@@ -204,8 +207,8 @@ export function MainChatDrawerView({
               </TouchableOpacity>
             </View>
 
-            {/* 現在の現場 — px-3 py-2.5 bg-white/5 rounded-xl */}
-            <View style={[styles.siteBox, { backgroundColor: siteBg }]}>
+            {/* 現在の現場 — px-3 py-2.5 bg-white/5 rounded-xl border */}
+            <View style={[styles.siteBox, { backgroundColor: siteBg, borderColor: borderColor }]}>
               {/* text-xs siteLabelText mb-0.5 → "現在の現場" */}
               <Text style={[styles.siteLabel, { color: textSecondary }]}>
                 現在の現場
@@ -305,10 +308,8 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
 
-  // pt-14 pb-5 px-5 border-b
-  // pt-14 = 56px, pb-5 = 20px, px-5 = 20px
+  // pt は useSafeAreaInsets で動的に上書き / pb-5 = 20px, px-5 = 20px
   header: {
-    paddingTop: 56,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
@@ -338,12 +339,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // px-3 py-2.5 rounded-xl
+  // px-3 py-2.5 rounded-xl border
   // px-3 = 12px, py-2.5 = 10px, rounded-xl = 12
   siteBox: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
+    borderWidth: 1,
   },
 
   // text-xs siteLabelText mb-0.5

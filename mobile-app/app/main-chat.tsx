@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Pressable,
+  PanResponder,
   useColorScheme,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
@@ -1345,6 +1346,20 @@ export default function SimpleChatScreen() {
   const [isPlusSheetOpen, setIsPlusSheetOpen] = useState(false)
   const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false)
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system')
+
+  // 左端エッジスワイプ → drawer を開く
+  // x0 < 20: 画面左端20px以内から始まったジェスチャーのみ
+  // dx > 10 かつ |dx| > |dy|*1.5: 横方向優勢のスワイプ
+  // release 時 dx > 50: 十分に右へ引いたら開く
+  const edgePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, { x0, dx, dy }) =>
+        x0 < 20 && dx > 10 && Math.abs(dx) > Math.abs(dy) * 1.5,
+      onPanResponderRelease: (_evt, { dx }) => {
+        if (dx > 50) setIsMenuOpen(true)
+      },
+    })
+  ).current
 
   const scrollViewRef = useRef<ScrollView | null>(null)
   const inputRef = useRef<TextInput | null>(null)
@@ -2862,6 +2877,7 @@ export default function SimpleChatScreen() {
         style={[styles.container, { backgroundColor: theme.background.primary }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        {...edgePanResponder.panHandlers}
       >
         {/* ヘッダー — Figma App.tsx lines 222-248 */}
         <View style={[styles.header, { backgroundColor: theme.background.primary }]}>
