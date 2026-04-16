@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Modal,
   Pressable,
   PanResponder,
+  Animated,
+  Easing,
   useColorScheme,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
@@ -1347,16 +1349,48 @@ export default function SimpleChatScreen() {
   const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false)
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system')
 
-  // 左端エッジスワイプ → drawer を開く
-  // x0 < 20: 画面左端20px以内から始まったジェスチャーのみ
-  // dx > 10 かつ |dx| > |dy|*1.5: 横方向優勢のスワイプ
-  // release 時 dx > 50: 十分に右へ引いたら開く
+  // ==========================================================================
+  // Drawer アニメーション制御
+  // drawerX: -DRAWER_WIDTH (全閉) ↔ 0 (全開)
+  // isMenuOpenRef: PanResponder クロージャ内のスタール防止用
+  // ==========================================================================
+  const DRAWER_WIDTH = 280
+  const drawerX = useRef(new Animated.Value(-DRAWER_WIDTH)).current
+  const isMenuOpenRef = useRef(false)
+  const drawerOverlayOpacity = useRef(
+    drawerX.interpolate({ inputRange: [-DRAWER_WIDTH, 0], outputRange: [0, 1], extrapolate: 'clamp' })
+  ).current
+  useEffect(() => { isMenuOpenRef.current = isMenuOpen }, [isMenuOpen])
+
+  // 左端エッジスワイプ drag-follow
+  // grant: Modal をマウントし -DRAWER_WIDTH から追従開始
+  // move:  指の dx に合わせて drawerX をリアルタイム更新
+  // release: 35% 以上 or 速度 > 0.5 → 開く、そうでなければ戻す
   const edgePanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_evt, { x0, dx, dy }) =>
-        x0 < 20 && dx > 10 && Math.abs(dx) > Math.abs(dy) * 1.5,
-      onPanResponderRelease: (_evt, { dx }) => {
-        if (dx > 50) setIsMenuOpen(true)
+        !isMenuOpenRef.current && x0 < 20 && dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.5,
+      onPanResponderGrant: () => {
+        // Modal を待たずに drawerX だけ即時リセット
+        // 常時マウント済みのパネルが次フレームから動き始める (ゼロラグ)
+        drawerX.setValue(-DRAWER_WIDTH)
+      },
+      onPanResponderMove: (_evt, { dx }) => {
+        drawerX.setValue(Math.min(0, Math.max(-DRAWER_WIDTH, -DRAWER_WIDTH + dx)))
+      },
+      onPanResponderRelease: (_evt, { dx, vx }) => {
+        if (dx / DRAWER_WIDTH > 0.35 || vx > 0.5) {
+          // 確定: すぐ interactive にしてから完了アニメ
+          setIsMenuOpen(true)
+          Animated.timing(drawerX, {
+            toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+          }).start()
+        } else {
+          // キャンセル: アニメで戻す (isMenuOpen は false のまま)
+          Animated.timing(drawerX, {
+            toValue: -DRAWER_WIDTH, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+          }).start()
+        }
       },
     })
   ).current
@@ -2810,7 +2844,20 @@ export default function SimpleChatScreen() {
     openProjectSelector()
   }
 
-  const closeMenu = () => setIsMenuOpen(false)
+  // drawerX をリセットして即時閉じ (ナビゲーション遷移時など)
+  const closeMenu = useCallback(() => {
+    drawerX.setValue(-DRAWER_WIDTH)
+    setIsMenuOpen(false)
+  }, [drawerX])
+
+  // ハンバーガー押下でアニメを起動して開く
+  const openDrawer = useCallback(() => {
+    drawerX.setValue(-DRAWER_WIDTH)
+    setIsMenuOpen(true)
+    Animated.timing(drawerX, {
+      toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    }).start()
+  }, [drawerX])
 
   const stubMenu = (title: string) => { closeMenu(); Alert.alert(title, 'このメニューは次のPRで接続予定です。') }
 
@@ -2887,7 +2934,7 @@ export default function SimpleChatScreen() {
               styles.headerMenuButton,
               { backgroundColor: resolvedScheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
             ]}
-            onPress={() => setIsMenuOpen(true)}
+            onPress={openDrawer}
           >
             <Feather name="menu" size={20} color={theme.text.primary} />
           </TouchableOpacity>
@@ -2922,6 +2969,8 @@ export default function SimpleChatScreen() {
           onItemAction={handleDrawerAction}
           isDark={resolvedScheme === 'dark'}
           currentSiteName={selectedProject?.name ?? null}
+          animTranslateX={drawerX}
+          animOverlayOpacity={drawerOverlayOpacity}
         />
 
         {/* 表示テーマ — Figma正本準拠移植 (Phase 1 純UI) */}

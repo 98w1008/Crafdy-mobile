@@ -1,15 +1,17 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import {
   View,
   Text,
   TouchableOpacity,
-  Modal,
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
+  Animated,
+  Easing,
+  PanResponder,
 } from 'react-native'
 import Feather from '@expo/vector-icons/Feather'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 /**
  * Phase 1 純UI再現: main-chat の左 drawer
@@ -120,6 +122,10 @@ interface Props {
   onItemAction: (action: DrawerAction) => void
   isDark: boolean
   currentSiteName: string | null
+  // main-chat.tsx の drawerX / drawerOverlayOpacity を直接受け取る
+  // drag-follow はここで制御し、main-chat の PanResponder と協調する
+  animTranslateX: Animated.Value
+  animOverlayOpacity: Animated.Value
 }
 
 // =============================================================================
@@ -132,9 +138,9 @@ export function MainChatDrawerView({
   onItemAction,
   isDark,
   currentSiteName,
+  animTranslateX,
+  animOverlayOpacity,
 }: Props) {
-  const insets = useSafeAreaInsets()
-
   // Figma themeStyles.drawerBg
   // dark:  bg-gradient-to-b from-[#0f1922] to-[#0A1628] → 近似単色
   // light: bg-white
@@ -161,36 +167,89 @@ export function MainChatDrawerView({
     onItemAction(item.action)
   }
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-    >
-      {/* フルスクリーンコンテナ — absolute inset-0 z-40 */}
-      <View style={styles.container}>
-        {/* オーバーレイ — absolute inset-0 bg-black/60 backdrop-blur-sm */}
-        <Pressable
-          style={[styles.overlay, { backgroundColor: overlayColor }]}
-          onPress={onClose}
-        />
+  // =====================================================================
+  // X ボタン / オーバーレイタップ: アニメアウト後に onClose
+  // メニュー項目タップは handleItem → onClose() で即時閉じ (ナビゲーション優先)
+  // =====================================================================
+  const DRAWER_WIDTH = 280
 
-        {/* Drawer パネル — absolute top-0 left-0 bottom-0 w-[280px] z-50 */}
-        <Pressable
+  const handleClose = () => {
+    Animated.timing(animTranslateX, {
+      toValue: -DRAWER_WIDTH,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => onClose())
+  }
+
+  // =====================================================================
+  // 閉じ方向 drag-follow PanResponder
+  // drawer が開いている間、左へスワイプすると指に追従して閉じる
+  // 30% 以上 or 速度 > 0.5 で確定、そうでなければスナップで戻す
+  // =====================================================================
+  const closePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        dx < -8 && Math.abs(dx) > Math.abs(dy) * 1.5,
+      onPanResponderMove: (_, { dx }) => {
+        // dx は負 (左方向) / 0 が全開、-DRAWER_WIDTH が全閉
+        animTranslateX.setValue(Math.min(0, dx))
+      },
+      onPanResponderRelease: (_, { dx, vx }) => {
+        if (dx < -(DRAWER_WIDTH * 0.30) || vx < -0.5) {
+          Animated.timing(animTranslateX, {
+            toValue: -DRAWER_WIDTH, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+          }).start(() => onClose())
+        } else {
+          Animated.spring(animTranslateX, { toValue: 0, useNativeDriver: true }).start()
+        }
+      },
+    })
+  ).current
+
+  // Android ハードウェアバック対応
+  useEffect(() => {
+    if (!visible) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose()
+      return true
+    })
+    return () => sub.remove()
+  }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // =====================================================================
+  // 常時マウント方式: Modal を使わず View + pointerEvents で制御
+  // visible=false → pointerEvents='none' でタッチを素通り / 描画コストは最小
+  // visible=true  → pointerEvents='auto' でオーバーレイ・パネルが通常動作
+  // 効果: Modal マウント待ち由来の初動ラグをゼロにする
+  // =====================================================================
+  return (
+      <View
+        style={styles.container}
+        pointerEvents={visible ? 'auto' : 'none'}
+      >
+        {/* オーバーレイ — absolute inset-0 bg-black/60 backdrop-blur-sm, opacity でフェード */}
+        <Animated.View style={[styles.overlay, { backgroundColor: overlayColor, opacity: animOverlayOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} />
+        </Animated.View>
+
+        {/* Drawer パネル — absolute top-0 left-0 bottom-0 w-[280px] z-50, translateX でスライド */}
+        {/* closePanResponder: 左スワイプで指に追従して閉じる */}
+        {/* 最初の Pressable (absoluteFillObject): タップがオーバーレイに漏れないよう受け止める */}
+        <Animated.View
           style={[
             styles.panel,
             {
               backgroundColor: panelBg,
               borderRightColor: borderColor,
+              transform: [{ translateX: animTranslateX }],
             },
           ]}
-          onPress={() => {
-            // パネル内タップでオーバーレイ閉じを止める
-          }}
+          {...closePanResponder.panHandlers}
         >
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => {}} />
           {/* ===== ヘッダー — pt-14 pb-5 px-5 border-b (pt はノッチ対応) ===== */}
-          <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: borderColor }]}>
+          <View style={[styles.header, { borderBottomColor: borderColor }]}>
             {/* flex items-center justify-between mb-3 */}
             <View style={styles.headerRow}>
               {/* h2 text-lg font-medium → "メニュー" */}
@@ -200,7 +259,7 @@ export function MainChatDrawerView({
               {/* X ボタン — w-8 h-8 rounded-full buttonBg */}
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: closeButtonBg }]}
-                onPress={onClose}
+                onPress={handleClose}
                 accessibilityLabel="ドロワーを閉じる"
               >
                 <Feather name="x" size={18} color={textSecondary} />
@@ -271,9 +330,8 @@ export function MainChatDrawerView({
               </View>
             ))}
           </ScrollView>
-        </Pressable>
+        </Animated.View>
       </View>
-    </Modal>
   )
 }
 
@@ -282,9 +340,12 @@ export function MainChatDrawerView({
 // =============================================================================
 
 const styles = StyleSheet.create({
-  // absolute inset-0 — フルスクリーンラッパー
+  // 常時マウントラッパー — absolute inset-0, zIndex で他要素より前面
+  // pointerEvents は props.visible で動的制御 (visible=false → 'none' で完全素通り)
   container: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    elevation: 100,
   },
 
   // absolute inset-0 z-40
@@ -308,8 +369,10 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
 
-  // pt は useSafeAreaInsets で動的に上書き / pb-5 = 20px, px-5 = 20px
+  // 常時マウント方式では SafeAreaView の内側に配置されるため
+  // status bar 分の insets は不要 — 固定 paddingTop:20 で header に十分な余白
   header: {
+    paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomWidth: 1,

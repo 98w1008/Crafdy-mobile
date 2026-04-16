@@ -33,15 +33,15 @@ export function MainChatHomeView({ displayName, chips, onChipPress, isDark }: Pr
     <View style={styles.homeContainer}>
       {/* AIウェルカムメッセージ — mb-7 mt-2 */}
       <View style={styles.homeWelcome}>
-        {/* text-3xl mb-3 leading-tight */}
-        <Text style={[styles.homeWelcomeTitle, { color: textPrimary }]}>
+        {/* 小さい挨拶 — 名前あり / なし */}
+        <Text style={[styles.homeWelcomeGreeting, { color: textSecondary }]}>
           {displayName ? `${displayName}さん、お疲れさまです。` : 'お疲れさまです。'}
-          {'\n'}今日は何を手伝いましょうか？
         </Text>
-        {/* text-sm textSecondary leading-relaxed */}
-        <Text style={[styles.homeWelcomeSubtext, { color: textSecondary }]}>
-          日報・経費・請求・見積を、{'\n'}チャットでそのまま進められます。
+        {/* hero タイトル — 短く、入力欄へ視線を誘導 */}
+        <Text style={[styles.homeWelcomeTitle, { color: textPrimary }]}>
+          今日は何をしますか？
         </Text>
+        {/* 補助文は削除 — プロンプトチップスで案内 */}
       </View>
 
       {/* Prompt Chips — mb-8 -mx-5 (edge-to-edge horizontal scroll) */}
@@ -88,20 +88,19 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
 
-  // text-3xl mb-3 leading-tight
-  // text-3xl = 30px, leading-tight ≈ 1.2 → lineHeight 36
-  homeWelcomeTitle: {
-    fontSize: 30,
-    fontWeight: '400',
-    lineHeight: 36,
-    marginBottom: 12,
+  // 小さい挨拶 — text-sm / secondary color
+  homeWelcomeGreeting: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 4,
   },
 
-  // text-sm leading-relaxed
-  // text-sm = 14px, leading-relaxed ≈ 1.6 → lineHeight 22
-  homeWelcomeSubtext: {
-    fontSize: 14,
-    lineHeight: 22,
+  // hero タイトル — text-2xl / prominent
+  homeWelcomeTitle: {
+    fontSize: 24,
+    fontWeight: '500',
+    lineHeight: 32,
+    marginBottom: 0,
   },
 
   // -mx-5 mb-8: negative margin to escape parent paddingHorizontal:20
