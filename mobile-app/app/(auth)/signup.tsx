@@ -1,21 +1,40 @@
 import React, { useState } from 'react'
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  Alert, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
-  SafeAreaView 
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import Feather from '@expo/vector-icons/Feather'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { supabase, supabaseReady } from '@/lib/supabase'
 import { router, useLocalSearchParams } from 'expo-router'
-import { Colors, Spacing, Typography, BorderRadius } from '@/constants/Colors'
 import * as Haptics from 'expo-haptics'
 
-const theme = Colors.light
-const accent = Colors.accent
+/**
+ * 親方・代表アカウント作成画面
+ * Figma正本: Crafdyauthdesign/src/app/components/SignUpScreen.tsx
+ *
+ * 再現対象:
+ * - 背景: #0A1628 → #0D1B33 → #0A1628 縦グラデーション
+ * - 戻るボタン: ArrowLeft + "戻る"
+ * - ロゴ: 56×56 rounded-2xl + "親方・代表向け" ラベル + "アカウント作成" タイトル
+ * - Pill型入力: mail / lock / lock (+ 既存の氏名・会社名フィールド)
+ * - 既存同意チェックボックス維持
+ * - Pill型 gradient ボタン
+ *
+ * 既存ロジック維持:
+ * - fullName / company / email / password / confirmPassword / agreedToTerms / agreedToPrivacy
+ * - validateForm / handleSignup / toSignupErrorText
+ * - supabase.auth.signUp + owner-setup 遷移
+ */
 
 const toSignupErrorText = (raw: string) => {
   const msg = String(raw || '').toLowerCase()
@@ -29,7 +48,6 @@ export default function SignupScreen() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>()
   const [fullName, setFullName] = useState('')
   const [company, setCompany] = useState('')
-  // 代表・親方アカウント専用（roleは固定）
   const role = 'parent'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -74,8 +92,6 @@ export default function SignupScreen() {
     return true
   }
 
-  const canSignup = supabaseReady && validateForm
-
   const handleSignup = async () => {
     if (!validateForm()) return
     if (!supabase || !supabaseReady) {
@@ -108,7 +124,6 @@ export default function SignupScreen() {
         return
       }
 
-      // メール確認がOFFの環境では、そのまま signed_in になれる
       if (data?.session) {
         router.replace({ pathname: '/owner-setup', params: { returnTo: String(returnTo || '') } } as any)
         return
@@ -134,8 +149,6 @@ export default function SignupScreen() {
     }
   }
 
-  // handleRoleSelect関数は不要（削除）
-
   const toggleTermsAgreement = () => {
     setAgreedToTerms(!agreedToTerms)
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -146,329 +159,296 @@ export default function SignupScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
   }
 
+  const canSubmit = agreedToTerms && agreedToPrivacy && !loading
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Logo Section */}
-        <View style={styles.logoSection}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>C</Text>
-          </View>
-          <Text style={styles.title}>Crafdy Mobile</Text>
-          <Text style={styles.subtitle}>代表・親方アカウント作成</Text>
-        </View>
+    <LinearGradient
+      colors={['#0A1628', '#0D1B33', '#0A1628']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.gradient}
+    >
+      {/* 背景デコ */}
+      <View style={styles.blobTopRight} />
+      <View style={styles.blobBottomLeft} />
 
-        {/* Form Section */}
-        <View style={styles.form}>
-          {/* 氏名 */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>氏名 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="山田太郎"
-              value={fullName}
-              onChangeText={setFullName}
-              placeholderTextColor={theme.text.tertiary}
-              autoCapitalize="words"
-            />
-          </View>
+      <SafeAreaView style={styles.safeArea}>
+        {/* 戻るボタン */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Feather name="arrow-left" size={20} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.backButtonText}>戻る</Text>
+        </TouchableOpacity>
 
-          {/* 会社名 */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>会社名 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="株式会社○○工務店"
-              value={company}
-              onChangeText={setCompany}
-              placeholderTextColor={theme.text.tertiary}
-            />
-          </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.inner}>
 
-
-          {/* メールアドレス */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>メールアドレス *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="your@email.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholderTextColor={theme.text.tertiary}
-            />
-          </View>
-
-          {/* パスワード */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>パスワード *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="6文字以上で入力"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholderTextColor={theme.text.tertiary}
-            />
-          </View>
-
-          {/* パスワード確認 */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>パスワード確認 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="パスワードを再入力"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              placeholderTextColor={theme.text.tertiary}
-            />
-          </View>
-
-          {/* 利用規約・プライバシーポリシー同意 */}
-          <View style={styles.agreementSection}>
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={toggleTermsAgreement}
-            >
-              <View style={[
-                styles.checkbox,
-                agreedToTerms && styles.checkboxChecked
-              ]}>
-                {agreedToTerms && <Text style={styles.checkmark}>✓</Text>}
+              {/* ロゴ + タイトル */}
+              <View style={styles.header}>
+                <LinearGradient
+                  colors={['#3B82F6', '#4F46E5']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.logoBox}
+                >
+                  <Ionicons name="sparkles" size={26} color="#FFFFFF" />
+                </LinearGradient>
+                <View style={styles.headerText}>
+                  <View style={styles.roleRow}>
+                    <Feather name="user" size={16} color="rgba(255,255,255,0.6)" />
+                    <Text style={styles.roleLabel}>親方・代表向け</Text>
+                  </View>
+                  <Text style={styles.title}>アカウント作成</Text>
+                  <Text style={styles.subtitle}>組織の管理者アカウントを作成</Text>
+                </View>
               </View>
-              <Text style={styles.checkboxText}>
-                <Text style={styles.agreementLink}>利用規約</Text>
-                に同意します *
-              </Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={togglePrivacyAgreement}
-            >
-              <View style={[
-                styles.checkbox,
-                agreedToPrivacy && styles.checkboxChecked
-              ]}>
-                {agreedToPrivacy && <Text style={styles.checkmark}>✓</Text>}
+              {/* フォーム */}
+              <View style={styles.form}>
+                {/* 氏名 */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>氏名</Text>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="user" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="山田太郎"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={fullName}
+                      onChangeText={setFullName}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                </View>
+
+                {/* 会社名 */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>会社名</Text>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="briefcase" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="株式会社○○工務店"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={company}
+                      onChangeText={setCompany}
+                    />
+                  </View>
+                </View>
+
+                {/* メールアドレス */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>メールアドレス</Text>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="mail" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="your@email.com"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+
+                {/* パスワード */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>パスワード</Text>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="lock" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="8文字以上"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                    />
+                  </View>
+                </View>
+
+                {/* パスワード確認 */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>パスワード確認</Text>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="lock" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.inputField}
+                      placeholder="もう一度入力"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry
+                    />
+                  </View>
+                </View>
+
+                {/* 同意 — 既存ロジック維持 */}
+                <Text style={styles.termsNote}>
+                  アカウントを作成することで、
+                  <Text style={styles.termsLink}>利用規約</Text>
+                  および
+                  <Text style={styles.termsLink}>プライバシーポリシー</Text>
+                  に同意したものとみなされます。
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.checkRow}
+                  onPress={toggleTermsAgreement}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+                    {agreedToTerms && <Feather name="check" size={12} color="#FFFFFF" />}
+                  </View>
+                  <Text style={styles.checkLabel}>利用規約に同意する</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.checkRow}
+                  onPress={togglePrivacyAgreement}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.checkbox, agreedToPrivacy && styles.checkboxChecked]}>
+                    {agreedToPrivacy && <Feather name="check" size={12} color="#FFFFFF" />}
+                  </View>
+                  <Text style={styles.checkLabel}>プライバシーポリシーに同意する</Text>
+                </TouchableOpacity>
+
+                {/* アカウント作成ボタン */}
+                <TouchableOpacity
+                  style={[styles.submitButtonWrap, !canSubmit && styles.submitButtonDisabled]}
+                  onPress={handleSignup}
+                  disabled={!canSubmit}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={!canSubmit ? ['#4B5563', '#4B5563'] : ['#3B82F6', '#4F46E5']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.submitButtonInner}
+                  >
+                    <Text style={styles.submitButtonText}>
+                      {loading ? '作成中...' : 'アカウントを作成'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.checkboxText}>
-                <Text style={styles.agreementLink}>プライバシーポリシー</Text>
-                に同意します *
-              </Text>
-            </TouchableOpacity>
-          </View>
 
-          {/* アカウント作成ボタン */}
-          <TouchableOpacity
-            style={[
-              styles.button,
-              (!agreedToTerms || !agreedToPrivacy || loading) && styles.buttonDisabled
-            ]}
-            onPress={handleSignup}
-            disabled={!agreedToTerms || !agreedToPrivacy || loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? '作成中...' : 'アカウント作成'}
-            </Text>
-          </TouchableOpacity>
+              {/* ログインリンク */}
+              <View style={styles.loginLink}>
+                <Text style={styles.loginLinkText}>既にアカウントをお持ちの場合 </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(auth)/login' as any)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.loginLinkAction}>ログイン</Text>
+                </TouchableOpacity>
+              </View>
 
-          {/* ログインリンク */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>または</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => router.push('/(auth)/login')}
-          >
-            <Text style={styles.linkText}>
-              既にアカウントをお持ちの方はログイン
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => router.push('/(auth)/signup-with-code')}
-          >
-            <Text style={styles.linkText}>
-              職長の方は招待コードで登録
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            代表・親方アカウントでは全現場の管理・監督と{'\n'}
-            職長の招待・権限管理が可能です
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.background.primary,
+  gradient: { flex: 1 },
+  blobTopRight: {
+    position: 'absolute', top: -60, right: -60,
+    width: 300, height: 300, borderRadius: 150,
+    backgroundColor: 'rgba(59,130,246,0.09)',
   },
-  scrollView: {
-    flex: 1,
+  blobBottomLeft: {
+    position: 'absolute', bottom: -60, left: -60,
+    width: 260, height: 260, borderRadius: 130,
+    backgroundColor: 'rgba(99,102,241,0.09)',
   },
+  safeArea: { flex: 1 },
+  backButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8,
+  },
+  backButtonText: { fontSize: 16, color: 'rgba(255,255,255,0.6)' },
   scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing['2xl'],
+    flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24,
   },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: Spacing['2xl'],
+  inner: { gap: 32 },
+  header: { alignItems: 'center', gap: 16 },
+  logoBox: {
+    width: 56, height: 56, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
   },
-  logo: {
-    width: 80,
-    height: 80,
-    backgroundColor: accent.DEFAULT,
-    borderRadius: BorderRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
+  headerText: { alignItems: 'center', gap: 6 },
+  roleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2,
   },
-  logoText: {
-    color: theme.text.inverse,
-    fontSize: Typography['4xl'],
-    fontWeight: Typography.weights.bold,
+  roleLabel: { fontSize: 14, color: 'rgba(255,255,255,0.6)' },
+  title: { fontSize: 24, fontWeight: '600', color: 'rgba(255,255,255,0.95)' },
+  subtitle: { fontSize: 15, color: 'rgba(255,255,255,0.5)' },
+  form: { gap: 20 },
+  inputGroup: { gap: 8 },
+  label: { fontSize: 14, color: 'rgba(255,255,255,0.7)', paddingLeft: 16 },
+  inputWrapper: {
+    height: 56, borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row', alignItems: 'center',
   },
-  title: {
-    fontSize: Typography['3xl'],
-    fontWeight: Typography.weights.bold,
-    color: theme.text.primary,
-    marginBottom: Spacing.xs,
+  inputIcon: { marginLeft: 16 },
+  inputField: {
+    flex: 1, paddingLeft: 12, paddingRight: 16,
+    fontSize: 16, color: '#FFFFFF',
   },
-  subtitle: {
-    fontSize: Typography.lg,
-    color: theme.text.secondary,
-    textAlign: 'center',
+  termsNote: {
+    fontSize: 12, color: 'rgba(255,255,255,0.4)',
+    lineHeight: 18, paddingHorizontal: 4,
   },
-  form: {
-    gap: Spacing.lg,
-  },
-  inputGroup: {
-    gap: Spacing.xs,
-  },
-  label: {
-    fontSize: Typography.sm,
-    fontWeight: Typography.weights.medium,
-    color: theme.text.primary,
-  },
-  input: {
-    backgroundColor: theme.background.surface,
-    borderWidth: 1,
-    borderColor: theme.border.medium,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    fontSize: Typography.base,
-    color: theme.text.primary,
-  },
-  agreementSection: {
-    gap: Spacing.md,
-    marginTop: Spacing.sm,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+  termsLink: { color: '#60A5FA' },
+  checkRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 4,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: theme.border.medium,
-    borderRadius: BorderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.background.surface,
+    width: 20, height: 20, borderRadius: 6,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center', justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: accent.DEFAULT,
-    borderColor: accent.DEFAULT,
+    backgroundColor: '#3B82F6', borderColor: '#3B82F6',
   },
-  checkmark: {
-    color: theme.text.inverse,
-    fontSize: 12,
-    fontWeight: Typography.weights.bold,
+  checkLabel: { fontSize: 14, color: 'rgba(255,255,255,0.7)' },
+  submitButtonWrap: {
+    borderRadius: 999, overflow: 'hidden', marginTop: 8,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 12, elevation: 8,
   },
-  checkboxText: {
-    flex: 1,
-    fontSize: Typography.sm,
-    color: theme.text.primary,
-    lineHeight: 20,
+  submitButtonDisabled: { shadowOpacity: 0, elevation: 0 },
+  submitButtonInner: {
+    height: 56, alignItems: 'center', justifyContent: 'center',
   },
-  agreementLink: {
-    color: accent.DEFAULT,
-    fontWeight: Typography.weights.medium,
-    textDecorationLine: 'underline',
+  submitButtonText: { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  loginLink: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    justifyContent: 'center', alignItems: 'center',
   },
-  button: {
-    backgroundColor: accent.DEFAULT,
-    borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  buttonDisabled: {
-    backgroundColor: theme.text.tertiary,
-  },
-  buttonText: {
-    color: theme.text.inverse,
-    fontSize: Typography.base,
-    fontWeight: Typography.weights.semibold,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.lg,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: theme.border.light,
-  },
-  dividerText: {
-    marginHorizontal: Spacing.md,
-    fontSize: Typography.sm,
-    color: theme.text.secondary,
-  },
-  linkButton: {
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  linkText: {
-    color: accent.DEFAULT,
-    fontSize: Typography.base,
-    fontWeight: Typography.weights.medium,
-  },
-  footer: {
-    marginTop: Spacing['2xl'],
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: Typography.xs,
-    color: theme.text.tertiary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  loginLinkText: { fontSize: 14, color: 'rgba(255,255,255,0.5)' },
+  loginLinkAction: { fontSize: 14, color: '#60A5FA', fontWeight: '500' },
 })

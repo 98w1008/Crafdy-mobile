@@ -2,248 +2,324 @@ import React from 'react'
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
+  StyleSheet,
   SafeAreaView,
 } from 'react-native'
-import { Link, useLocalSearchParams } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
+import Ionicons from '@expo/vector-icons/Ionicons'
+import Feather from '@expo/vector-icons/Feather'
+import { router, useLocalSearchParams } from 'expo-router'
 
+/**
+ * 認証入口画面
+ * Figma正本: Crafdyauthdesign/src/app/components/WelcomeScreen.tsx
+ *
+ * 再現対象:
+ * - 背景: #0A1628 → #0D1B33 → #0A1628 縦グラデーション
+ * - ロゴ行: 44×44 rounded-2xl グラデーション + Sparkles + "Crafdy"
+ * - メインメッセージ: "現場の仕事を、チャットで前に進める"
+ * - サブメッセージ: "日報、経費、請求、見積を AIがサポートする業務アシスタント"
+ * - Primary CTA: "ログイン" pill gradient + arrow-right
+ * - Divider: "アカウントを作成"
+ * - Secondary CTA 1: "親方・代表アカウントを作成"
+ * - Secondary CTA 2: "招待コードで参加"
+ * - Footer: 利用規約 · プライバシー
+ */
 export default function AuthScreen() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>()
+  const rto = String(returnTo || '')
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Header Section */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.logo}>🏗️</Text>
-          </View>
-          <Text style={styles.title}>Crafdy Mobile</Text>
-          <Text style={styles.subtitle}>建設現場管理をスマートに</Text>
-        </View>
+    <LinearGradient
+      colors={['#0A1628', '#0D1B33', '#0A1628']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.gradient}
+    >
+      {/* 背景デコ: top-right blob / bottom-left blob */}
+      <View style={styles.blobTopRight} />
+      <View style={styles.blobBottomLeft} />
 
-        {/* Features Section */}
-        <View style={styles.featuresContainer}>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>📋</Text>
-            <Text style={styles.featureText}>日報作成・管理</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>💬</Text>
-            <Text style={styles.featureText}>リアルタイムチャット</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>📊</Text>
-            <Text style={styles.featureText}>進捗管理・分析</Text>
-          </View>
-        </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
 
-        {/* Auth Buttons Section */}
-        <View style={styles.authSection}>
-          <Text style={styles.sectionTitle}>参加方法を選んでください</Text>
-          {String(returnTo || '').trim() ? (
-            <Text style={styles.returnHint}>ログイン後は元の画面に戻ります</Text>
-          ) : null}
+          {/* ── 上部: ロゴ + メッセージ ── */}
+          <View style={styles.topSection}>
+            {/* ロゴ行 */}
+            <View style={styles.logoRow}>
+              <LinearGradient
+                colors={['#3B82F6', '#4F46E5']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.logoBox}
+              >
+                <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+              </LinearGradient>
+              <Text style={styles.appName}>Crafdy</Text>
+            </View>
 
-          <Link href={{ pathname: '/(auth)/login', params: { returnTo: String(returnTo || '') } }} asChild>
-            <TouchableOpacity style={[styles.button, styles.loginButton]}>
-              <Text style={[styles.buttonText, styles.loginButtonText]}>
-                既存アカウントでログイン
+            {/* メインメッセージ */}
+            <View style={styles.messageBlock}>
+              <Text style={styles.messageTitle}>
+                現場の仕事を、{'\n'}チャットで前に進める
               </Text>
-              <Text style={[styles.buttonHint, styles.loginButtonHint]}>
-                すでに作成済みの方
+              <Text style={styles.messageSub}>
+                日報、経費、請求、見積を{'\n'}AIがサポートする業務アシスタント
               </Text>
+            </View>
+          </View>
+
+          {/* ── 下部: CTA ── */}
+          <View style={styles.ctaSection}>
+            {/* Primary CTA — ログイン */}
+            <TouchableOpacity
+              style={styles.primaryButtonWrap}
+              onPress={() =>
+                router.push({
+                  pathname: '/(auth)/login',
+                  params: { returnTo: rto },
+                } as any)
+              }
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={['#3B82F6', '#4F46E5']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.primaryButtonInner}
+              >
+                <Text style={styles.primaryButtonText}>ログイン</Text>
+                <Feather name="arrow-right" size={20} color="#FFFFFF" />
+              </LinearGradient>
             </TouchableOpacity>
-          </Link>
 
-          <Link href={{ pathname: '/(auth)/signup', params: { returnTo: String(returnTo || '') } }} asChild>
-            <TouchableOpacity style={[styles.button, styles.signupButton]}>
-              <Text style={[styles.buttonText, styles.signupButtonText]}>
-                代表・親方としてはじめる
-              </Text>
-              <Text style={styles.buttonHint}>
-                会社/チームを新しく作成
-              </Text>
-            </TouchableOpacity>
-          </Link>
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>アカウントを作成</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
-          <Link href="/join/by-code" asChild>
-            <TouchableOpacity style={[styles.button, styles.codeButton]}>
-              <Text style={[styles.buttonText, styles.codeButtonText]}>
-                招待コードで参加
-              </Text>
-              <Text style={styles.buttonHint}>
-                職長・従業員の方（招待された方）
-              </Text>
-            </TouchableOpacity>
-          </Link>
+            {/* Secondary CTAs */}
+            <View style={styles.secondaryGroup}>
+              {/* 親方・代表アカウントを作成 */}
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(auth)/signup',
+                    params: { returnTo: rto },
+                  } as any)
+                }
+                activeOpacity={0.8}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  親方・代表アカウントを作成
+                </Text>
+              </TouchableOpacity>
 
-          <Text style={styles.termsText}>
-            続行することで、利用規約とプライバシーポリシーに同意したものとみなされます
-          </Text>
+              {/* 招待コードで参加 */}
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() =>
+                  router.push('/(auth)/signup-with-code' as any)
+                }
+                activeOpacity={0.8}
+              >
+                <Text style={styles.secondaryButtonText}>招待コードで参加</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Footer links */}
+            <View style={styles.footerLinks}>
+              <Text style={styles.footerLink}>利用規約</Text>
+              <Text style={styles.footerDot}>·</Text>
+              <Text style={styles.footerLink}>プライバシー</Text>
+            </View>
+          </View>
+
         </View>
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          © 2024 Crafdy Mobile - 建設業界のDX化を支援
-        </Text>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  gradient: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
+
+  // 背景デコ: Tailwind blur-3xl → 絶対配置 半透明円
+  blobTopRight: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(59,130,246,0.09)',
+  },
+  blobBottomLeft: {
+    position: 'absolute',
+    bottom: -60,
+    left: -60,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: 'rgba(99,102,241,0.09)',
+  },
+
+  safeArea: {
+    flex: 1,
+  },
+
+  // flex-1 flex flex-col justify-between px-6 py-12
   content: {
     flex: 1,
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
+    paddingTop: 64,
+    paddingBottom: 24,
+  },
+
+  // flex flex-col items-center mt-16
+  topSection: {
+    alignItems: 'center',
+  },
+
+  // flex items-center gap-2.5 mb-8
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 32,
+  },
+
+  // w-11 h-11 rounded-2xl
+  logoBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  header: {
+
+  // text-3xl font-semibold text-white tracking-tight
+  appName: {
+    fontSize: 30,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+
+  // text-center space-y-3 mb-12
+  messageBlock: {
     alignItems: 'center',
+    gap: 12,
     marginBottom: 48,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#0E73E0',
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    shadowColor: '#0E73E0',
+
+  // text-2xl font-semibold text-white/95 leading-snug px-4
+  messageTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.95)',
+    textAlign: 'center',
+    lineHeight: 34,
+    paddingHorizontal: 16,
+  },
+
+  // text-base text-white/50 leading-relaxed px-2
+  messageSub: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+
+  // space-y-4 max-w-sm mx-auto w-full
+  ctaSection: {
+    width: '100%',
+    gap: 16,
+  },
+
+  // w-full h-14 rounded-full gradient
+  primaryButtonWrap: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
   },
-  logo: {
-    fontSize: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  featuresContainer: {
-    marginBottom: 48,
-  },
-  featureItem: {
+  primaryButtonInner: {
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  featureIcon: {
-    fontSize: 24,
-    marginRight: 16,
-  },
-  featureText: {
-    fontSize: 16,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  authSection: {
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    width: '100%',
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
-    marginBottom: 6,
-  },
-  returnHint: {
-    width: '100%',
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 12,
-  },
-  button: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: 8,
   },
-  loginButton: {
-    backgroundColor: '#0E73E0',
-  },
-  signupButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#0E73E0',
-  },
-  codeButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  buttonText: {
+  primaryButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonHint: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#64748B',
-  },
-  loginButtonText: {
+    fontWeight: '500',
     color: '#FFFFFF',
   },
-  loginButtonHint: {
-    color: 'rgba(255,255,255,0.85)',
-  },
-  signupButtonText: {
-    color: '#0E73E0',
-  },
-  codeButtonText: {
-    color: '#0F172A',
-  },
-  termsText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginTop: 16,
-    paddingHorizontal: 16,
-  },
-  footer: {
-    paddingBottom: 20,
-    paddingHorizontal: 24,
+
+  // flex items-center gap-3 py-2
+  divider: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
   },
-  footerText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  dividerText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+  },
+
+  // space-y-3
+  secondaryGroup: {
+    gap: 12,
+  },
+
+  // w-full h-14 rounded-full bg-white/5 border-white/10
+  secondaryButton: {
+    height: 56,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.9)',
+  },
+
+  // flex items-center justify-center gap-4 pt-6 text-sm
+  footerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingTop: 8,
+  },
+  footerLink: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  footerDot: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.2)',
   },
 })
