@@ -14,8 +14,8 @@ export default function IndexScreen() {
         console.log('✅ User authenticated, navigating to main chat')
         router.replace('/main-chat')
       } else {
-        console.log('❌ No user, navigating to login')
-        router.replace('/(auth)/login')
+        console.log('❌ No user, navigating to auth screen')
+        router.replace('/(auth)/auth-screen')
       }
     }
   }, [user, loading])
@@ -27,7 +27,7 @@ export default function IndexScreen() {
       // 現在のルートが(tabs)内にいる場合はログイン画面に戻す
       const currentRoute = router.canGoBack() ? 'unknown' : 'root'
       if (currentRoute === 'unknown') {
-        router.replace('/(auth)/login')
+        router.replace('/(auth)/auth-screen')
       }
     }
   }, [user])

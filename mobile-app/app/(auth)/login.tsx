@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import Feather from '@expo/vector-icons/Feather'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { supabase, supabaseReady } from '@/lib/supabase'
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, useLocalSearchParams, useNavigation } from 'expo-router'
 
 /**
  * ログイン画面
@@ -50,6 +50,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const navigation = useNavigation()
+  const canGoBack = navigation.canGoBack()
 
   const canLogin = !!email && !!password
 
@@ -93,15 +95,17 @@ export default function LoginScreen() {
       <View style={styles.blobBottomLeft} />
 
       <SafeAreaView style={styles.safeArea}>
-        {/* 戻るボタン */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Feather name="arrow-left" size={20} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.backButtonText}>戻る</Text>
-        </TouchableOpacity>
+        {/* 戻るボタン — 前の画面がある時だけ表示 */}
+        {canGoBack && (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Feather name="arrow-left" size={20} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.backButtonText}>戻る</Text>
+          </TouchableOpacity>
+        )}
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
