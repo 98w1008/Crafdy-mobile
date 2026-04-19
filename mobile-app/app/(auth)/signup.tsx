@@ -202,7 +202,7 @@ export default function SignupScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.logoBox}
                 >
-                  <Ionicons name="sparkles" size={26} color="#FFFFFF" />
+                  <Ionicons name="sparkles" size={28} color="#FFFFFF" />
                 </LinearGradient>
                 <View style={styles.headerText}>
                   <View style={styles.roleRow}>
@@ -220,7 +220,7 @@ export default function SignupScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>氏名</Text>
                   <View style={styles.inputWrapper}>
-                    <Feather name="user" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <Feather name="user" size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.inputField}
                       placeholder="山田太郎"
@@ -236,7 +236,7 @@ export default function SignupScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>会社名</Text>
                   <View style={styles.inputWrapper}>
-                    <Feather name="briefcase" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <Feather name="briefcase" size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.inputField}
                       placeholder="株式会社○○工務店"
@@ -251,7 +251,7 @@ export default function SignupScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>メールアドレス</Text>
                   <View style={styles.inputWrapper}>
-                    <Feather name="mail" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <Feather name="mail" size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.inputField}
                       placeholder="your@email.com"
@@ -269,7 +269,7 @@ export default function SignupScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>パスワード</Text>
                   <View style={styles.inputWrapper}>
-                    <Feather name="lock" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <Feather name="lock" size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.inputField}
                       placeholder="8文字以上"
@@ -285,7 +285,7 @@ export default function SignupScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>パスワード確認</Text>
                   <View style={styles.inputWrapper}>
-                    <Feather name="lock" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <Feather name="lock" size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.inputField}
                       placeholder="もう一度入力"
@@ -370,23 +370,23 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
   blobTopRight: {
-    position: 'absolute', top: -60, right: -60,
-    width: 300, height: 300, borderRadius: 150,
-    backgroundColor: 'rgba(59,130,246,0.09)',
+    position: 'absolute', top: 0, right: 0,
+    width: 384, height: 384, borderRadius: 192,
+    backgroundColor: 'rgba(59,130,246,0.10)',
   },
   blobBottomLeft: {
-    position: 'absolute', bottom: -60, left: -60,
-    width: 260, height: 260, borderRadius: 130,
-    backgroundColor: 'rgba(99,102,241,0.09)',
+    position: 'absolute', bottom: 0, left: 0,
+    width: 320, height: 320, borderRadius: 160,
+    backgroundColor: 'rgba(99,102,241,0.10)',
   },
   safeArea: { flex: 1 },
   backButton: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8,
+    paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8,
   },
   backButtonText: { fontSize: 16, color: 'rgba(255,255,255,0.6)' },
   scrollContent: {
-    flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24,
+    flexGrow: 1, paddingHorizontal: 24, paddingVertical: 48,
   },
   inner: { gap: 32 },
   header: { alignItems: 'center', gap: 16 },
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   },
   roleLabel: { fontSize: 14, color: 'rgba(255,255,255,0.6)' },
   title: { fontSize: 24, fontWeight: '600', color: 'rgba(255,255,255,0.95)' },
-  subtitle: { fontSize: 15, color: 'rgba(255,255,255,0.5)' },
+  subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.5)' },
   form: { gap: 20 },
   inputGroup: { gap: 8 },
   label: { fontSize: 14, color: 'rgba(255,255,255,0.7)', paddingLeft: 16 },
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   },
   checkLabel: { fontSize: 14, color: 'rgba(255,255,255,0.7)' },
   submitButtonWrap: {
-    borderRadius: 999, overflow: 'hidden', marginTop: 8,
+    borderRadius: 999, overflow: 'hidden', marginTop: 24,
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25, shadowRadius: 12, elevation: 8,

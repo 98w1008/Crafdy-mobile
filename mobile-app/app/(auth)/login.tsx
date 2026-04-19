@@ -122,7 +122,7 @@ export default function LoginScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.logoBox}
                 >
-                  <Ionicons name="sparkles" size={26} color="#FFFFFF" />
+                  <Ionicons name="sparkles" size={28} color="#FFFFFF" />
                 </LinearGradient>
                 <View style={styles.headerText}>
                   <Text style={styles.title}>ログイン</Text>
@@ -136,7 +136,7 @@ export default function LoginScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>メールアドレス</Text>
                   <View style={styles.inputWrapper}>
-                    <Feather name="mail" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <Feather name="mail" size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.inputField}
                       placeholder="your@email.com"
@@ -154,7 +154,7 @@ export default function LoginScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>パスワード</Text>
                   <View style={styles.inputWrapper}>
-                    <Feather name="lock" size={18} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                    <Feather name="lock" size={20} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.inputField}
                       placeholder="••••••••"
@@ -232,21 +232,21 @@ const styles = StyleSheet.create({
   },
   blobTopRight: {
     position: 'absolute',
-    top: -60,
-    right: -60,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(59,130,246,0.09)',
+    top: 0,
+    right: 0,
+    width: 384,
+    height: 384,
+    borderRadius: 192,
+    backgroundColor: 'rgba(59,130,246,0.10)',
   },
   blobBottomLeft: {
     position: 'absolute',
-    bottom: -60,
-    left: -60,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(99,102,241,0.09)',
+    bottom: 0,
+    left: 0,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(99,102,241,0.10)',
   },
   safeArea: {
     flex: 1,
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 24,
     paddingBottom: 8,
   },
   backButtonText: {
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingVertical: 48,
   },
 
   // max-w-sm mx-auto w-full space-y-8
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
 
   // text-base text-white/50
   subtitle: {
-    fontSize: 15,
+    fontSize: 16,
     color: 'rgba(255,255,255,0.5)',
   },
 
@@ -368,11 +368,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // w-full h-14 rounded-full gradient mt-6
+  // w-full h-14 rounded-full gradient mt-6 (mt-6 = 24px on top of space-y-5 gap)
   loginButtonWrap: {
     borderRadius: 999,
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: 24,
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,

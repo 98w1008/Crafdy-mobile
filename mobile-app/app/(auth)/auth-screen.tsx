@@ -150,24 +150,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // 背景デコ: Tailwind blur-3xl → 絶対配置 半透明円
+  // 背景デコ: w-96 h-96 bg-blue-500/10 top-0 right-0 / w-80 h-80 bg-indigo-500/10 bottom-0 left-0
   blobTopRight: {
     position: 'absolute',
-    top: -60,
-    right: -60,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(59,130,246,0.09)',
+    top: 0,
+    right: 0,
+    width: 384,
+    height: 384,
+    borderRadius: 192,
+    backgroundColor: 'rgba(59,130,246,0.10)',
   },
   blobBottomLeft: {
     position: 'absolute',
-    bottom: -60,
-    left: -60,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(99,102,241,0.09)',
+    bottom: 0,
+    left: 0,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(99,102,241,0.10)',
   },
 
   safeArea: {
@@ -179,13 +179,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 64,
-    paddingBottom: 24,
+    paddingVertical: 48,
   },
 
   // flex flex-col items-center mt-16
   topSection: {
     alignItems: 'center',
+    marginTop: 64,
   },
 
   // flex items-center gap-2.5 mb-8
@@ -196,11 +196,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
 
-  // w-11 h-11 rounded-2xl
+  // w-11 h-11 rounded-2xl (Tailwind rounded-2xl = 1rem = 16px)
   logoBox: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
 
   // text-base text-white/50 leading-relaxed px-2
   messageSub: {
-    fontSize: 15,
+    fontSize: 16,
     color: 'rgba(255,255,255,0.5)',
     textAlign: 'center',
     lineHeight: 24,
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
-    paddingTop: 8,
+    paddingTop: 24,
   },
   footerLink: {
     fontSize: 14,
