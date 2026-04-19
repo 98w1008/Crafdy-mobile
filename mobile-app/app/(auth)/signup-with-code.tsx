@@ -164,6 +164,19 @@ export default function SignupWithCodeScreen() {
         router.replace('/member-setup' as any)
         return
       }
+
+      // session が返らない場合 = Supabase の email confirmation が有効
+      // 即時ログインを試みて、確認不要なら自動で進む
+      const { data: loginData } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      })
+      if (loginData?.session) {
+        router.replace('/member-setup' as any)
+        return
+      }
+
+      // メール確認が必要な環境 — 確認後にログインするよう案内
       Alert.alert(
         '参加登録が完了しました',
         `${invitationData!.projectName}現場への参加が確認されました。\n\n確認メールを送信しましたので、メール内のリンクを開いてからログインしてください。`,

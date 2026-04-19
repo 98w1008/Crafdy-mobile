@@ -129,6 +129,18 @@ export default function SignupScreen() {
         return
       }
 
+      // session が返らない場合 = Supabase の email confirmation が有効
+      // 即時ログインを試みて、確認不要なら自動で進む
+      const { data: loginData } = await supabase!.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      })
+      if (loginData?.session) {
+        router.replace({ pathname: '/owner-setup', params: { returnTo: String(returnTo || '') } } as any)
+        return
+      }
+
+      // メール確認が必要な環境 — 確認後にログインするよう案内
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       Alert.alert(
         'アカウントを作成しました',

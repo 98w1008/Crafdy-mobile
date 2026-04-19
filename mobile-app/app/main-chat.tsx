@@ -15,10 +15,12 @@ import {
   Animated,
   Easing,
   useColorScheme,
+  Alert,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { getAccessContext, type AccessContext } from '@/lib/access-context'
 import { supabase, supabaseReady } from '@/lib/supabase'
+import { createInvitationCode } from '@/lib/invitation-system'
 import Feather from '@expo/vector-icons/Feather'
 import { MainChatHomeView } from '@/components/chat/MainChatHomeView'
 import { MainChatAttachSheetView } from '@/components/chat/MainChatAttachSheetView'
@@ -2861,6 +2863,40 @@ export default function SimpleChatScreen() {
 
   const stubMenu = (title: string) => { closeMenu(); Alert.alert(title, 'このメニューは次のPRで接続予定です。') }
 
+  const handleInvite = async () => {
+    closeMenu()
+    if (!selectedProject) {
+      Alert.alert(
+        '現場を選択してください',
+        '招待コードは現場ごとに発行されます。先に現場を選択してください。',
+        [
+          { text: '現場を選ぶ', onPress: () => navigateFromMenu('/project-selector') },
+          { text: 'キャンセル', style: 'cancel' },
+        ]
+      )
+      return
+    }
+    if (!supabaseReady || !supabase) {
+      Alert.alert('エラー', '認証が完了していません')
+      return
+    }
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData?.user) {
+      Alert.alert('エラー', 'ログインが必要です')
+      return
+    }
+    const { code, error } = await createInvitationCode(selectedProject.id, userData.user.id)
+    if (error || !code) {
+      Alert.alert('招待コードを発行できませんでした', error || '時間をおいてもう一度お試しください')
+      return
+    }
+    Alert.alert(
+      '招待コードを発行しました',
+      `コード: ${code}\n\n有効期限: 72時間\n\nこのコードを招待したい相手に共有してください。\n相手は「招待を受けて参加」画面でコードを入力することで参加できます。`,
+      [{ text: 'OK' }]
+    )
+  }
+
   const handleLogout = async () => { closeMenu(); try { if (supabaseReady && supabase) await supabase.auth.signOut() } catch { /* ignore */ }; router.replace('/(auth)/auth-screen' as any) }
 
   const openPlusSheet = () => setIsPlusSheetOpen(true)
@@ -2903,7 +2939,7 @@ export default function SimpleChatScreen() {
       case 'project-list':      return navigateFromMenu('/project-selector')
       case 'invoices':          return navigateFromMenu('/invoice')
       case 'estimates':         return stubMenu('見積履歴')
-      case 'invite':            return stubMenu('メンバーを招待')
+      case 'invite':            return handleInvite()
       case 'company':           return navigateFromMenu('/company-billing-profile')
       case 'invoice-template':  return navigateFromMenu('/invoice-templates')
       case 'billing':           return navigateFromMenu('/billing')
