@@ -62,10 +62,10 @@ export default function AuthScreen() {
             {/* メインメッセージ */}
             <View style={styles.messageBlock}>
               <Text style={styles.messageTitle}>
-                現場の仕事を、{'\n'}チャットで前に進める
+                現場の仕事を、{'\n'}チャットで片づける
               </Text>
               <Text style={styles.messageSub}>
-                日報、経費、請求、見積を{'\n'}AIがサポートする業務アシスタント
+                日報、経費、請求、見積を支える{'\n'}AI業務アシスタント
               </Text>
             </View>
           </View>
