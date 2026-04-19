@@ -72,12 +72,12 @@ export default function AuthScreen() {
 
           {/* ── 下部: CTA ── */}
           <View style={styles.ctaSection}>
-            {/* Primary CTA — ログイン */}
+            {/* Primary CTA — 代表として始める */}
             <TouchableOpacity
               style={styles.primaryButtonWrap}
               onPress={() =>
                 router.push({
-                  pathname: '/(auth)/login',
+                  pathname: '/(auth)/signup',
                   params: { returnTo: rto },
                 } as any)
               }
@@ -89,45 +89,35 @@ export default function AuthScreen() {
                 end={{ x: 1, y: 0 }}
                 style={styles.primaryButtonInner}
               >
-                <Text style={styles.primaryButtonText}>ログイン</Text>
+                <Text style={styles.primaryButtonText}>代表として始める</Text>
                 <Feather name="arrow-right" size={20} color="#FFFFFF" />
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>アカウントを作成</Text>
-              <View style={styles.dividerLine} />
-            </View>
+            {/* Secondary CTA — 招待を受けて参加 */}
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() =>
+                router.push('/(auth)/signup-with-code' as any)
+              }
+              activeOpacity={0.8}
+            >
+              <Text style={styles.secondaryButtonText}>招待を受けて参加</Text>
+            </TouchableOpacity>
 
-            {/* Secondary CTAs */}
-            <View style={styles.secondaryGroup}>
-              {/* 親方・代表アカウントを作成 */}
+            {/* ログイン — 既存ユーザー向け下部リンク */}
+            <View style={styles.loginLink}>
+              <Text style={styles.loginLinkText}>すでにアカウントをお持ちの方</Text>
               <TouchableOpacity
-                style={styles.secondaryButton}
                 onPress={() =>
                   router.push({
-                    pathname: '/(auth)/signup',
+                    pathname: '/(auth)/login',
                     params: { returnTo: rto },
                   } as any)
                 }
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <Text style={styles.secondaryButtonText}>
-                  親方・代表アカウントを作成
-                </Text>
-              </TouchableOpacity>
-
-              {/* 招待コードで参加 */}
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={() =>
-                  router.push('/(auth)/signup-with-code' as any)
-                }
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryButtonText}>招待コードで参加</Text>
+                <Text style={styles.loginLinkAction}>ログイン</Text>
               </TouchableOpacity>
             </View>
 
@@ -268,28 +258,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // flex items-center gap-3 py-2
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  dividerText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.4)',
-  },
-
-  // space-y-3
-  secondaryGroup: {
-    gap: 12,
-  },
-
   // w-full h-14 rounded-full bg-white/5 border-white/10
   secondaryButton: {
     height: 56,
@@ -304,6 +272,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: 'rgba(255,255,255,0.9)',
+  },
+
+  // 下部ログインリンク — 既存ユーザー向け
+  loginLink: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: 8,
+  },
+  loginLinkText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  loginLinkAction: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.75)',
   },
 
   // flex items-center justify-center gap-4 pt-6 text-sm

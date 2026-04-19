@@ -222,7 +222,7 @@ export default function SignupWithCodeScreen() {
                 <View style={styles.headerText}>
                   <View style={styles.roleRow}>
                     <Feather name="users" size={16} color="rgba(255,255,255,0.6)" />
-                    <Text style={styles.roleLabel}>職長・メンバー向け</Text>
+                    <Text style={styles.roleLabel}>招待された方向け</Text>
                   </View>
                   <Text style={styles.title}>招待コードで参加</Text>
                   <Text style={styles.subtitle}>
