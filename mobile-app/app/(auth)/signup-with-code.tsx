@@ -160,10 +160,14 @@ export default function SignupWithCodeScreen() {
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      if (authData.session) {
+        router.replace('/member-setup' as any)
+        return
+      }
       Alert.alert(
-        'アカウント作成完了',
-        `${invitationData!.projectName}現場の職長として登録されました。\n\nメールアドレスに確認メールを送信しました。メール内のリンクをクリックしてアカウントを有効化してからログインしてください。`,
-        [{ text: 'ログイン画面へ', onPress: () => router.replace('/(auth)/login') }]
+        '参加登録が完了しました',
+        `${invitationData!.projectName}現場への参加が確認されました。\n\n確認メールを送信しましたので、メール内のリンクを開いてからログインしてください。`,
+        [{ text: 'ログインへ', onPress: () => router.replace('/(auth)/login' as any) }]
       )
     } catch (error) {
       console.error('Signup error:', error)
@@ -277,7 +281,7 @@ export default function SignupWithCodeScreen() {
                 {!invitationData && (
                   <View style={styles.infoBox}>
                     <Text style={styles.infoBoxText}>
-                      招待コードは、組織の親方または代表から共有されます。コードを入力すると、その組織のメンバーとして参加できます。
+                      親方または代表から届いた招待コードを入力すると、現場のメンバーとして参加できます。
                     </Text>
                   </View>
                 )}

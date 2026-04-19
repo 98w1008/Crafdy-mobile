@@ -210,7 +210,7 @@ export default function SignupScreen() {
                     <Text style={styles.roleLabel}>親方・代表向け</Text>
                   </View>
                   <Text style={styles.title}>アカウント作成</Text>
-                  <Text style={styles.subtitle}>組織の管理者アカウントを作成</Text>
+                  <Text style={styles.subtitle}>会社・現場を管理する代表として登録</Text>
                 </View>
               </View>
 
