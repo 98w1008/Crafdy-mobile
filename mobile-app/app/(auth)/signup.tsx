@@ -17,6 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { supabase, supabaseReady } from '@/lib/supabase'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
+import { setMyMembership } from '@/lib/membership-store'
 
 /**
  * 親方・代表アカウント作成画面
@@ -122,6 +123,19 @@ export default function SignupScreen() {
         console.error('Signup error:', error)
         Alert.alert('作成できません', toSignupErrorText(error.message))
         return
+      }
+
+      // owner membership を AsyncStorage に書き込む
+      // これにより project-selector の canCreateProject が true になる
+      if (data?.user) {
+        await setMyMembership({
+          id: `owner-${data.user.id}`,
+          companyId: data.user.id,
+          userId: data.user.id,
+          role: 'owner',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        })
       }
 
       if (data?.session) {

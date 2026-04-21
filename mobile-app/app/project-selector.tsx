@@ -86,7 +86,12 @@ export default function ProjectSelectorScreen() {
 
   const handleSelect = async (p: StoredProject) => {
     await setSelectedProject({ id: p.id, name: p.name })
-    backToMainChatSelected(p)
+    const to = String(returnTo || '').trim()
+    if (to && to !== '/main-chat') {
+      router.back()
+    } else {
+      backToMainChatSelected(p)
+    }
   }
 
   const handleCreate = async () => {
@@ -95,17 +100,28 @@ export default function ProjectSelectorScreen() {
 
     try {
       const p = await createProject({ name: trimmed, address, memo })
+      await setSelectedProject({ id: p.id, name: p.name })
       setName('')
       setAddress('')
       setMemo('')
-      backToMainChatCreated(p)
+      const to = String(returnTo || '').trim()
+      if (to && to !== '/main-chat') {
+        router.back()
+      } else {
+        backToMainChatCreated(p)
+      }
     } catch (e) {
       console.error('Failed to create project', e)
       Alert.alert('エラー', '現場の作成に失敗しました')
     }
   }
 
-  const canCreateProject = access?.kind === 'assigned' && access.role === 'owner'
+  // owner-setup から来た場合は access context に依らず作成を許可する
+  // (signup 直後は membership が unassigned のままのことがあるため)
+  const isOwnerOnboarding = String(returnTo || '').trim() === '/owner-setup'
+  const canCreateProject =
+    isOwnerOnboarding ||
+    (access?.kind === 'assigned' && access.role === 'owner')
 
   return (
     <SafeAreaView style={styles.container}>
@@ -130,6 +146,55 @@ export default function ProjectSelectorScreen() {
         </View>
 
         <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 24 }}>
+
+          {/* 空状態 + owner: 作成フォームを先に出す */}
+          {!loading && projects.length === 0 && canCreateProject && (
+            <>
+              <Text style={styles.sectionTitle}>最初の現場を作る</Text>
+              <Text style={styles.muted}>現場名だけで作れます（住所・メモは任意）。</Text>
+              <View style={styles.form}>
+                <Text style={styles.label}>現場名（必須）</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="例）○○ビル新築工事"
+                  placeholderTextColor={Colors.dark.text.tertiary}
+                  maxLength={60}
+                  autoFocus
+                />
+                <Text style={styles.label}>住所（任意）</Text>
+                <TextInput
+                  style={styles.input}
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="例）東京都新宿区…"
+                  placeholderTextColor={Colors.dark.text.tertiary}
+                  maxLength={120}
+                />
+                <Text style={styles.label}>メモ（任意）</Text>
+                <TextInput
+                  style={[styles.input, styles.textarea]}
+                  value={memo}
+                  onChangeText={setMemo}
+                  placeholder="例）元請: ○○建設 / 鍵: 1234"
+                  placeholderTextColor={Colors.dark.text.tertiary}
+                  multiline
+                  maxLength={240}
+                />
+                <TouchableOpacity
+                  style={[styles.primaryButton, !canCreate && styles.primaryButtonDisabled]}
+                  disabled={!canCreate}
+                  onPress={handleCreate}
+                  accessibilityLabel="現場を作成"
+                >
+                  <Text style={styles.primaryButtonText}>＋ 現場を作成</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.divider} />
+            </>
+          )}
+
           <Text style={styles.sectionTitle}>現場一覧</Text>
 
           {loading ? (
@@ -137,7 +202,7 @@ export default function ProjectSelectorScreen() {
           ) : projects.length === 0 ? (
             <Text style={styles.muted}>
               {canCreateProject
-                ? 'まだ現場がありません。下で作成してください。'
+                ? '作成した現場がここに表示されます。'
                 : access?.kind === 'assigned' && access.role === 'member'
                   ? '割り当てられた現場がまだありません。代表に現場の割り当てを依頼してください。'
                   : '現場がまだありません。'}
@@ -187,13 +252,12 @@ export default function ProjectSelectorScreen() {
             </View>
           )}
 
-          {canCreateProject ? (
+          {/* 既存現場がある場合の追加作成フォーム */}
+          {canCreateProject && projects.length > 0 ? (
             <>
               <View style={styles.divider} />
-
               <Text style={styles.sectionTitle}>新規作成</Text>
               <Text style={styles.muted}>必須は現場名だけです（住所/メモは任意）。</Text>
-
               <View style={styles.form}>
                 <Text style={styles.label}>現場名（必須）</Text>
                 <TextInput
@@ -204,7 +268,6 @@ export default function ProjectSelectorScreen() {
                   placeholderTextColor={Colors.dark.text.tertiary}
                   maxLength={60}
                 />
-
                 <Text style={styles.label}>住所（任意）</Text>
                 <TextInput
                   style={styles.input}
@@ -214,7 +277,6 @@ export default function ProjectSelectorScreen() {
                   placeholderTextColor={Colors.dark.text.tertiary}
                   maxLength={120}
                 />
-
                 <Text style={styles.label}>メモ（任意）</Text>
                 <TextInput
                   style={[styles.input, styles.textarea]}
@@ -225,7 +287,6 @@ export default function ProjectSelectorScreen() {
                   multiline
                   maxLength={240}
                 />
-
                 <TouchableOpacity
                   style={[styles.primaryButton, !canCreate && styles.primaryButtonDisabled]}
                   disabled={!canCreate}

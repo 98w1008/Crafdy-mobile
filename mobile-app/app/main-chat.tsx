@@ -30,7 +30,7 @@ import { MainChatThemeSheetView } from '@/components/chat/MainChatThemeSheetView
 // NOTE: 初期MVPでは「明日の予定」は必須にしない（docs/skills/main-chat-ux.md）
 const ASK_NEXT_PLAN_IN_MVP = false
 import { Colors, Spacing, Typography, BorderRadius, Shadows, getThemeColors, type ColorScheme } from '@/constants/Colors'
-import { getProjectById, getSelectedProject, setSelectedProject, updateProject } from '@/lib/project-store'
+import { getProjectById, getSelectedProject, setSelectedProject, updateProject, listProjects } from '@/lib/project-store'
 import { createExpense, ExpenseKind, submitExpense } from '@/lib/expense-store'
 import {
   createDailyReport,
@@ -2866,14 +2866,26 @@ export default function SimpleChatScreen() {
   const handleInvite = async () => {
     closeMenu()
     if (!selectedProject) {
-      Alert.alert(
-        '現場を選択してください',
-        '招待コードは現場ごとに発行されます。先に現場を選択してください。',
-        [
-          { text: '現場を選ぶ', onPress: () => navigateFromMenu('/project-selector') },
-          { text: 'キャンセル', style: 'cancel' },
-        ]
-      )
+      const allProjects = await listProjects()
+      if (allProjects.length === 0) {
+        Alert.alert(
+          'まず現場を作りましょう',
+          '招待コードは現場ごとに発行されます。先に現場を1つ作ってから招待できます。',
+          [
+            { text: '現場を作る', onPress: () => navigateFromMenu('/project-selector') },
+            { text: 'キャンセル', style: 'cancel' },
+          ]
+        )
+      } else {
+        Alert.alert(
+          '現場を選んでください',
+          '招待コードは現場ごとに発行されます。先に現場を選択してください。',
+          [
+            { text: '現場を選ぶ', onPress: () => navigateFromMenu('/project-selector') },
+            { text: 'キャンセル', style: 'cancel' },
+          ]
+        )
+      }
       return
     }
     if (!supabaseReady || !supabase) {
