@@ -14,6 +14,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { supabase, supabaseReady } from '@/lib/supabase'
 import { getSelectedProject, listProjects } from '@/lib/project-store'
 import { createInvitationCode } from '@/lib/invitation-system'
+import { listDocuments } from '@/lib/project-documents-store'
 
 export default function OwnerSetupScreen() {
   const router = useRouter()
@@ -22,6 +23,7 @@ export default function OwnerSetupScreen() {
 
   const [selectedProject, setSelectedProjectState] = useState<{ id: string; name: string } | null>(null)
   const [projectCount, setProjectCount] = useState(0)
+  const [documentCount, setDocumentCount] = useState(0)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteCode, setInviteCode] = useState<string | null>(null)
 
@@ -30,19 +32,26 @@ export default function OwnerSetupScreen() {
       const [proj, all] = await Promise.all([getSelectedProject(), listProjects()])
       setSelectedProjectState(proj)
       setProjectCount(all.length)
+      if (proj) {
+        const docs = await listDocuments(proj.id)
+        setDocumentCount(docs.length)
+      } else {
+        setDocumentCount(0)
+      }
     } catch {
       // ignore
     }
   }, [])
 
-  useFocusEffect(reload)
+  useFocusEffect(useCallback(() => { void reload() }, [reload]))
 
   const step1Done = projectCount > 0
-  const step2Done = !!inviteCode
+  const step2Done = documentCount > 0
+  const step3Done = !!inviteCode
 
-  // 次に押すべきステップ番号
-  const activeStep = !step1Done ? 1 : !step2Done ? 2 : 3
+  const activeStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4
 
+  // Step 1: 現場を作る / 選ぶ
   const handleStep1 = () => {
     router.push({
       pathname: '/project-selector',
@@ -50,7 +59,42 @@ export default function OwnerSetupScreen() {
     } as any)
   }
 
-  const handleStep2 = async () => {
+  // Step 2: 現場資料を追加する
+  const handleStep2 = () => {
+    if (projectCount === 0) {
+      Alert.alert(
+        'まず現場を作りましょう',
+        '資料は現場ごとに管理されます。ステップ 1 で現場を作ってから進めてください。',
+        [
+          { text: '現場を作る', onPress: handleStep1 },
+          { text: 'キャンセル', style: 'cancel' },
+        ]
+      )
+      return
+    }
+    if (!selectedProject) {
+      Alert.alert(
+        '現場を選んでください',
+        '現場はありますが選択されていません。',
+        [
+          { text: '現場を選ぶ', onPress: handleStep1 },
+          { text: 'キャンセル', style: 'cancel' },
+        ]
+      )
+      return
+    }
+    router.push({
+      pathname: '/project-documents',
+      params: {
+        projectId: selectedProject.id,
+        projectName: selectedProject.name,
+        returnTo: '/owner-setup',
+      },
+    } as any)
+  }
+
+  // Step 3: 招待コードを発行する
+  const handleStep3 = async () => {
     if (projectCount === 0) {
       Alert.alert(
         'まず現場を作りましょう',
@@ -100,7 +144,8 @@ export default function OwnerSetupScreen() {
     }
   }
 
-  const handleStep3 = () => {
+  // Step 4: main-chat を使い始める
+  const handleStep4 = () => {
     router.replace(toMain as any)
   }
 
@@ -116,22 +161,35 @@ export default function OwnerSetupScreen() {
     },
     {
       num: 2,
+      label: '現場資料を追加する',
+      desc: step2Done
+        ? `${documentCount} 件の資料を追加済み`
+        : step1Done
+          ? '工事明細・請書・工程表などを追加できます（スキップ可）'
+          : '現場を作ってから進めます',
+      done: step2Done,
+      onPress: handleStep2,
+      skippable: true,
+    },
+    {
+      num: 3,
       label: '招待コードを発行する',
       desc: inviteCode
         ? `発行済: ${inviteCode}`
         : step1Done
-          ? '現場のメンバーを招待できます'
+          ? '現場のメンバーを招待できます（スキップ可）'
           : '現場を作ってから進めます',
-      done: step2Done,
-      onPress: handleStep2,
+      done: step3Done,
+      onPress: handleStep3,
       loading: inviteLoading,
+      skippable: true,
     },
     {
-      num: 3,
+      num: 4,
       label: 'main-chat を使い始める',
       desc: '日報・経費・請求書をチャットで進めます',
       done: false,
-      onPress: handleStep3,
+      onPress: handleStep4,
     },
   ] as const
 
@@ -141,7 +199,7 @@ export default function OwnerSetupScreen() {
 
         <View style={styles.header}>
           <Text style={styles.title}>はじめましょう</Text>
-          <Text style={styles.subtitle}>この 3 ステップで使い始められます</Text>
+          <Text style={styles.subtitle}>この順番で進めると、すぐ使い始められます</Text>
         </View>
 
         <View style={styles.steps}>
@@ -149,6 +207,7 @@ export default function OwnerSetupScreen() {
             const isActive = step.num === activeStep
             const isDone = step.done
             const loading = 'loading' in step ? step.loading : false
+            const skippable = 'skippable' in step ? step.skippable : false
             return (
               <TouchableOpacity
                 key={step.num}
@@ -177,13 +236,18 @@ export default function OwnerSetupScreen() {
 
                 {/* テキスト */}
                 <View style={styles.stepBody}>
-                  <Text style={[
-                    styles.stepLabel,
-                    isDone && styles.stepLabelDone,
-                    isActive && styles.stepLabelActive,
-                  ]}>
-                    {step.label}
-                  </Text>
+                  <View style={styles.stepLabelRow}>
+                    <Text style={[
+                      styles.stepLabel,
+                      isDone && styles.stepLabelDone,
+                      isActive && styles.stepLabelActive,
+                    ]}>
+                      {step.label}
+                    </Text>
+                    {skippable && !isDone && (
+                      <Text style={styles.skipTag}>スキップ可</Text>
+                    )}
+                  </View>
                   <Text style={styles.stepDesc}>{step.desc}</Text>
                 </View>
 
@@ -282,6 +346,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  stepLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   stepLabel: {
     fontSize: 15,
     fontWeight: '600',
@@ -292,6 +362,15 @@ const styles = StyleSheet.create({
   },
   stepLabelActive: {
     color: 'rgba(255,255,255,0.95)',
+  },
+  skipTag: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   stepDesc: {
     fontSize: 13,
